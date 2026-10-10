@@ -9,7 +9,7 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/zzzwannasleep/MangaMatcher/release.yml?style=flat-square&branch=main)](https://github.com/zzzwannasleep/MangaMatcher/actions/workflows/release.yml)
 [![Stars](https://img.shields.io/github/stars/zzzwannasleep/MangaMatcher?style=flat-square&color=ffd700)](https://github.com/zzzwannasleep/MangaMatcher/stargazers)
 [![License](https://img.shields.io/github/license/zzzwannasleep/MangaMatcher?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue?style=flat-square)](#)
+[![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=flat-square)](#)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512bd4?style=flat-square)](#)
 [![Language](https://img.shields.io/badge/C%23-12-178600?style=flat-square)](#)
 
