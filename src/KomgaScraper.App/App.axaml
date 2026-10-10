@@ -147,24 +147,34 @@
             </Style.Animations>
         </Style>
 
-        <!-- 按钮：hover 轻浮 + 按压缩放，120ms 缓动（.app 与 .primary 两类按钮都生效） -->
+        <!-- 按钮：hover 轻浮 + 按压缩放，120ms 缓动。
+             变换只作用于模板内容层（PART_ContentPresenter），按钮外框即命中区保持静止，
+             指针不会因位移反复进出 :pointerover → 修复悬浮时按钮闪烁 -->
         <Style Selector="Button.app, Button.primary">
             <Setter Property="Transitions">
                 <Setter.Value>
                     <Transitions>
-                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"
-                            Easing="CubicEaseOut" />
                         <BrushTransition Property="Background" Duration="0:0:0.15" />
                         <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
                     </Transitions>
                 </Setter.Value>
             </Setter>
+        </Style>
+        <Style Selector="Button.app /template/ ContentPresenter#PART_ContentPresenter, Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Setter.Value>
+                    <Transitions>
+                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"
+                            Easing="CubicEaseOut" />
+                    </Transitions>
+                </Setter.Value>
+            </Setter>
             <Setter Property="RenderTransform" Value="none" />
         </Style>
-        <Style Selector="Button.app:pointerover, Button.primary:pointerover">
+        <Style Selector="Button.app:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="RenderTransform" Value="translateY(-1px)" />
         </Style>
-        <Style Selector="Button.app:pressed, Button.primary:pressed">
+        <Style Selector="Button.app:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="RenderTransform" Value="scale(0.97)" />
         </Style>
 
@@ -205,13 +215,11 @@
             <Setter Property="Opacity" Value="0.45" />
         </Style>
 
-        <!-- 候选卡片：hover 放大 + 阴影浮起，选中强调色描边 -->
+        <!-- 候选卡片：hover 阴影浮起 + 内容轻抬（变换作用于内容层，卡片外框命中区不动 → 不再闪），选中强调色描边 -->
         <Style Selector="Border.card">
             <Setter Property="Transitions">
                 <Setter.Value>
                     <Transitions>
-                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"
-                            Easing="CubicEaseOut" />
                         <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
                     </Transitions>
                 </Setter.Value>
@@ -224,9 +232,23 @@
             <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
         </Style>
         <Style Selector="Border.card:pointerover">
-            <Setter Property="RenderTransform" Value="scale(1.03)" />
             <Setter Property="BorderBrush" Value="{StaticResource AccentStrokeBrush}" />
             <Setter Property="BoxShadow" Value="0 4 14 #22000000" />
+        </Style>
+        <!-- 内容层轻抬：命中区在卡片外框，位移不会引起 :pointerover 振荡 -->
+        <Style Selector="Border.card StackPanel.cardInner">
+            <Setter Property="Transitions">
+                <Setter.Value>
+                    <Transitions>
+                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"
+                            Easing="CubicEaseOut" />
+                    </Transitions>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <Style Selector="Border.card:pointerover StackPanel.cardInner">
+            <Setter Property="RenderTransform" Value="translateY(-2px)" />
         </Style>
         <Style Selector="Border.card.selected">
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
@@ -320,7 +342,8 @@
             <Setter Property="Width" Value="26" />
             <Setter Property="Height" Value="26" />
         </Style>
-        <Style Selector="Ellipse.busySpinner">
+        <!-- 旋转圈：只在忙碌态（.open）挂动画，空闲时不空转耗 CPU -->
+        <Style Selector="Border.busyOverlay.open Ellipse.busySpinner">
             <Style.Animations>
                 <Animation Duration="0:0:0.9" IterationCount="Infinite">
                     <KeyFrame Cue="0.0">

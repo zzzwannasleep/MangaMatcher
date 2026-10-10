@@ -625,8 +625,19 @@ public sealed partial class MainWindow : Window
             b.IsEnabled = !busy;
         BtnCancel.IsEnabled = busy;
         BtnCancel.Opacity = busy ? 1 : 0.55;
-        if (busy) BusyOverlay.Classes.Add("open");
-        else BusyOverlay.Classes.Remove("open");
+        if (busy)
+        {
+            // 样式动画（IterationCount=Infinite + FillMode=Forward）在 class 移除后值会粘住，
+            // 所以关闭时显式归零 Opacity 并直接隐藏，开态重新交给动画接管
+            BusyOverlay.Classes.Add("open");
+            BusyOverlay.IsVisible = true;
+        }
+        else
+        {
+            BusyOverlay.Classes.Remove("open");
+            BusyOverlay.Opacity = 0;
+            BusyOverlay.IsVisible = false;
+        }
         if (!busy)
         {
             Progress.IsVisible = false;

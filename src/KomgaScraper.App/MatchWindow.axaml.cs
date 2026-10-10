@@ -113,7 +113,7 @@ public sealed partial class MatchWindow : Window
         {
             Classes = { "card" },
             Width = 126,
-            Child = new StackPanel { Children = { pic, title, author } },
+            Child = new StackPanel { Classes = { "cardInner" }, Children = { pic, title, author } },
             Tag = c,
         };
         box.PointerReleased += (_, _) => SelectCard(box);
