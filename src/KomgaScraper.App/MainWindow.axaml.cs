@@ -776,12 +776,14 @@ public sealed partial class MainWindow : Window
             : _rows.OrderBy(r => r.GetCell(colIndex), StringComparer.CurrentCulture).ToList();
         if (!ascending) sorted.Reverse();
 
-        // ObservableCollection.Move 逐个就位（DataGrid 随源集合自动重排）
-        for (var i = 0; i < sorted.Count; i++)
-        {
-            var old = _rows.IndexOf(sorted[i]);
-            if (old != i) _rows.Move(old, i);
-        }
+        // 注意：不能用 ObservableCollection.Move 就地重排——Avalonia DataGrid 的
+        // DataConnection 只处理 Add/Remove/Replace/Reset，Move 通知被静默忽略，
+        // 行序永远不会刷新。改为整体重建（触发 Reset，DataGrid 原生支持）；
+        // 复用同一批 SeriesRow 对象，勾选状态自然保留。
+        var selected = SeriesGrid.SelectedItem as SeriesRow;
+        _rows.Clear();
+        foreach (var r in sorted) _rows.Add(r);
+        if (selected != null) SeriesGrid.SelectedItem = selected;
         e.Handled = true;
     }
 
