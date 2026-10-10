@@ -4,16 +4,69 @@
              RequestedThemeVariant="Light">
 
     <Application.Resources>
-        <!-- 设计令牌：全站统一色板（原 WinForms 版升级版） -->
-        <SolidColorBrush x:Key="AccentBrush">#5B5BD6</SolidColorBrush>
-        <SolidColorBrush x:Key="AccentSoftBrush">#EDEDFB</SolidColorBrush>
-        <SolidColorBrush x:Key="SuccessBrush">#1F8A3B</SolidColorBrush>
-        <SolidColorBrush x:Key="WarnBrush">#B26A00</SolidColorBrush>
-        <SolidColorBrush x:Key="ErrorBrush">#D13438</SolidColorBrush>
-        <SolidColorBrush x:Key="LogBgBrush">#1C1C1E</SolidColorBrush>
-        <SolidColorBrush x:Key="LogFgBrush">#B8FFC9</SolidColorBrush>
-        <SolidColorBrush x:Key="CardBorderBrush">#D8D8E0</SolidColorBrush>
-        <SolidColorBrush x:Key="PanelBgBrush">#FBFBFD</SolidColorBrush>
+        <ResourceDictionary>
+
+            <!-- ================= 强调色（主题无关） ================= -->
+            <SolidColorBrush x:Key="AccentBrush">#5B5BD6</SolidColorBrush>
+            <SolidColorBrush x:Key="AccentHoverBrush">#4A4AC4</SolidColorBrush>
+            <SolidColorBrush x:Key="AccentStrokeBrush">#9E9EF0</SolidColorBrush>
+            <SolidColorBrush x:Key="SuccessBrush">#1F8A3B</SolidColorBrush>
+            <SolidColorBrush x:Key="WarnBrush">#B26A00</SolidColorBrush>
+            <SolidColorBrush x:Key="ErrorBrush">#D13438</SolidColorBrush>
+
+            <!-- ================= 主题令牌：Light / Dark 双词典 ================= -->
+            <ResourceDictionary.ThemeDictionaries>
+
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AppBgBrush">#F3F4F8</SolidColorBrush>
+                    <SolidColorBrush x:Key="PanelBgBrush">#FBFBFD</SolidColorBrush>
+                    <SolidColorBrush x:Key="CardBgBrush">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="CardBorderBrush">#D8D8E0</SolidColorBrush>
+                    <SolidColorBrush x:Key="BtnBgBrush">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="BtnHoverBrush">#EEEFFB</SolidColorBrush>
+                    <SolidColorBrush x:Key="BtnBorderHoverBrush">#9E9EF0</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextPrimaryBrush">#26263A</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextSecondaryBrush">#666677</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextTertiaryBrush">#A0A0B0</SolidColorBrush>
+                    <SolidColorBrush x:Key="GridLinesBrush">#ECECF2</SolidColorBrush>
+                    <SolidColorBrush x:Key="RowHoverBrush">#F3F3FA</SolidColorBrush>
+                    <SolidColorBrush x:Key="AccentSoftBrush">#EDEDFB</SolidColorBrush>
+                    <SolidColorBrush x:Key="SplitterBrush">#D0D0DA</SolidColorBrush>
+                    <SolidColorBrush x:Key="StatusBarBgBrush">#E9E9F0</SolidColorBrush>
+                    <SolidColorBrush x:Key="StatusBarBorderBrush">#D8D8E0</SolidColorBrush>
+                    <SolidColorBrush x:Key="OverlayBrush">#66FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="PlaceholderBgBrush">#F2F2F5</SolidColorBrush>
+                    <SolidColorBrush x:Key="LogBgBrush">#1C1C1E</SolidColorBrush>
+                    <SolidColorBrush x:Key="LogFgBrush">#B8FFC9</SolidColorBrush>
+                    <SolidColorBrush x:Key="LogTimeBrush">#787880</SolidColorBrush>
+                </ResourceDictionary>
+
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="AppBgBrush">#191A21</SolidColorBrush>
+                    <SolidColorBrush x:Key="PanelBgBrush">#22232D</SolidColorBrush>
+                    <SolidColorBrush x:Key="CardBgBrush">#262734</SolidColorBrush>
+                    <SolidColorBrush x:Key="CardBorderBrush">#3A3B4A</SolidColorBrush>
+                    <SolidColorBrush x:Key="BtnBgBrush">#2C2D3A</SolidColorBrush>
+                    <SolidColorBrush x:Key="BtnHoverBrush">#34364A</SolidColorBrush>
+                    <SolidColorBrush x:Key="BtnBorderHoverBrush">#6E6EE0</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextPrimaryBrush">#E8E9F0</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextSecondaryBrush">#A6A7B8</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextTertiaryBrush">#6E7080</SolidColorBrush>
+                    <SolidColorBrush x:Key="GridLinesBrush">#2E2F3C</SolidColorBrush>
+                    <SolidColorBrush x:Key="RowHoverBrush">#2D2E3C</SolidColorBrush>
+                    <SolidColorBrush x:Key="AccentSoftBrush">#31335A</SolidColorBrush>
+                    <SolidColorBrush x:Key="SplitterBrush">#3A3B4A</SolidColorBrush>
+                    <SolidColorBrush x:Key="StatusBarBgBrush">#1F2029</SolidColorBrush>
+                    <SolidColorBrush x:Key="StatusBarBorderBrush">#31323F</SolidColorBrush>
+                    <SolidColorBrush x:Key="OverlayBrush">#66000000</SolidColorBrush>
+                    <SolidColorBrush x:Key="PlaceholderBgBrush">#2B2C38</SolidColorBrush>
+                    <SolidColorBrush x:Key="LogBgBrush">#14151B</SolidColorBrush>
+                    <SolidColorBrush x:Key="LogFgBrush">#B8FFC9</SolidColorBrush>
+                    <SolidColorBrush x:Key="LogTimeBrush">#8A8CA0</SolidColorBrush>
+                </ResourceDictionary>
+
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 
     <Application.Styles>
@@ -36,6 +89,64 @@
             </Style.Animations>
         </Style>
 
+        <!-- 侧栏分组：错落上滑入场（附着一个一个接力，非齐步走） -->
+        <Style Selector="Border.group">
+            <Style.Animations>
+                <Animation Duration="0:0:0.38" Delay="0:0:0.06" FillMode="Forward" Easing="CubicEaseOut">
+                    <KeyFrame Cue="0.0">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="TranslateTransform.Y" Value="14" />
+                    </KeyFrame>
+                    <KeyFrame Cue="1.0">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="TranslateTransform.Y" Value="0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Border.group:nth-child(2)">
+            <Style.Animations>
+                <Animation Duration="0:0:0.38" Delay="0:0:0.12" FillMode="Forward" Easing="CubicEaseOut">
+                    <KeyFrame Cue="0.0">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="TranslateTransform.Y" Value="14" />
+                    </KeyFrame>
+                    <KeyFrame Cue="1.0">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="TranslateTransform.Y" Value="0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Border.group:nth-child(3)">
+            <Style.Animations>
+                <Animation Duration="0:0:0.38" Delay="0:0:0.18" FillMode="Forward" Easing="CubicEaseOut">
+                    <KeyFrame Cue="0.0">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="TranslateTransform.Y" Value="14" />
+                    </KeyFrame>
+                    <KeyFrame Cue="1.0">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="TranslateTransform.Y" Value="0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Border.group:nth-child(4)">
+            <Style.Animations>
+                <Animation Duration="0:0:0.38" Delay="0:0:0.24" FillMode="Forward" Easing="CubicEaseOut">
+                    <KeyFrame Cue="0.0">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="TranslateTransform.Y" Value="14" />
+                    </KeyFrame>
+                    <KeyFrame Cue="1.0">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="TranslateTransform.Y" Value="0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
         <!-- 按钮：hover 轻浮 + 按压缩放，120ms 缓动（.app 与 .primary 两类按钮都生效） -->
         <Style Selector="Button.app, Button.primary">
             <Setter Property="Transitions">
@@ -43,6 +154,8 @@
                     <Transitions>
                         <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"
                             Easing="CubicEaseOut" />
+                        <BrushTransition Property="Background" Duration="0:0:0.15" />
+                        <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
                     </Transitions>
                 </Setter.Value>
             </Setter>
@@ -54,14 +167,38 @@
         <Style Selector="Button.app:pressed, Button.primary:pressed">
             <Setter Property="RenderTransform" Value="scale(0.97)" />
         </Style>
+
+        <!-- 次级按钮：描边卡片式，不再灰成一团像禁用态 -->
+        <Style Selector="Button.app">
+            <Setter Property="Background" Value="{DynamicResource BtnBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+        <Style Selector="Button.app:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BtnHoverBrush}" />
+        </Style>
+        <Style Selector="Button.app:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource BtnBorderHoverBrush}" />
+        </Style>
+        <Style Selector="Button.app:disabled">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+
         <!-- 主操作按钮（强调色实心） -->
         <Style Selector="Button.primary">
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#4A4AC4" />
+            <Setter Property="Background" Value="{StaticResource AccentHoverBrush}" />
+        </Style>
+        <Style Selector="Button.primary:disabled">
+            <Setter Property="Opacity" Value="0.45" />
         </Style>
 
         <!-- 候选卡片：hover 放大 + 阴影浮起，选中强调色描边 -->
@@ -76,30 +213,31 @@
                 </Setter.Value>
             </Setter>
             <Setter Property="RenderTransform" Value="none" />
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1.5" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="4" />
-            <Setter Property="Background" Value="White" />
+            <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
         </Style>
         <Style Selector="Border.card:pointerover">
             <Setter Property="RenderTransform" Value="scale(1.03)" />
-            <Setter Property="BorderBrush" Value="#9E9EF0" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentStrokeBrush}" />
             <Setter Property="BoxShadow" Value="0 4 14 #22000000" />
         </Style>
         <Style Selector="Border.card.selected">
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
             <Setter Property="BoxShadow" Value="0 2 10 #335B5BD6" />
         </Style>
 
         <!-- 侧栏分组：hover 高亮标题 -->
         <Style Selector="Border.group">
-            <Setter Property="Background" Value="{StaticResource PanelBgBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="10,8" />
+            <Setter Property="BoxShadow" Value="0 1 3 #14000000" />
         </Style>
         <Style Selector="TextBlock.groupTitle">
             <Setter Property="FontSize" Value="12.5" />
@@ -109,11 +247,11 @@
         </Style>
         <Style Selector="TextBlock.fieldLabel">
             <Setter Property="FontSize" Value="11.5" />
-            <Setter Property="Foreground" Value="#666" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
             <Setter Property="Margin" Value="1,5,0,2" />
         </Style>
 
-        <!-- 列表行 hover 过渡 -->
+        <!-- 列表行 hover 过渡 + 悬停底色（透明行保持选中态可读） -->
         <Style Selector="DataGridRow">
             <Setter Property="Transitions">
                 <Transitions>
@@ -121,10 +259,16 @@
                 </Transitions>
             </Setter>
         </Style>
+        <Style Selector="DataGridRow:not(.selected)">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="DataGridRow:not(.selected):pointerover">
+            <Setter Property="Background" Value="{DynamicResource RowHoverBrush}" />
+        </Style>
 
-        <!-- 日志框 -->
+        <!-- 日志框（终端风，双主题各自配色） -->
         <Style Selector="ListBox#LogList">
-            <Setter Property="Background" Value="{StaticResource LogBgBrush}" />
+            <Setter Property="Background" Value="{DynamicResource LogBgBrush}" />
             <Setter Property="FontFamily" Value="Consolas, Menlo, monospace" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
@@ -143,9 +287,9 @@
             <Setter Property="Foreground" Value="#8FD98F" />
         </Style>
 
-        <!-- 忙碌遮罩：呼吸脉冲 -->
+        <!-- 忙碌遮罩：呼吸脉冲（遮罩色随主题） -->
         <Style Selector="Border.busyOverlay">
-            <Setter Property="Background" Value="#66FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource OverlayBrush}" />
             <Setter Property="Opacity" Value="0" />
             <Setter Property="IsHitTestVisible" Value="False" />
         </Style>

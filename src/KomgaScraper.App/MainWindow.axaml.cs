@@ -8,6 +8,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using KomgaScraper.Core;
@@ -85,10 +86,14 @@ public sealed partial class MainWindow : Window
         // 列表视图：直接绑定 ObservableCollection；筛选/排序见 ApplyFilter / OnSeriesSorting
         SeriesGrid.ItemsSource = _rows;
 
+        // 空态提示：行集合变化时联动（无数据=引导加载；有数据无匹配=提示调整筛选）
+        _rows.CollectionChanged += (_, _) => UpdateEmptyHint();
+
         WireEvents();
         SetupTray();
 
         LoadSettingsToUi();
+        ApplyTheme(_settings.Theme == "dark", persist: false);
         RebuildClients();
 
         // 首次运行：立刻生成一份默认 settings.json，用户能看到设置文件的确切位置
@@ -101,6 +106,27 @@ public sealed partial class MainWindow : Window
     private string DryRunText => _settings.DryRun
         ? "当前为 Dry-run 预览模式（不实际修改 Komga），取消勾选后执行真实更新"
         : "当前为真实更新模式：将直接修改 Komga 元数据";
+
+    // ================= 主题（深色/浅色） =================
+
+    /// <summary>切换全局主题变体并持久化。深浅切换即时生效（所有 DynamicResource 跟随）。</summary>
+    private void ApplyTheme(bool dark, bool persist)
+    {
+        Application.Current!.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        BtnTheme.Content = dark ? "☀" : "🌙";
+        ToolTip.SetTip(BtnTheme, dark ? "切换到浅色模式" : "切换到深色模式");
+        _settings.Theme = dark ? "dark" : "light";
+        if (persist) SaveSettings();
+    }
+
+    /// <summary>空态提示文案：无库数据给引导，有数据无匹配给筛选提示。</summary>
+    private void UpdateEmptyHint()
+    {
+        EmptyHint.IsVisible = _rows.Count == 0;
+        EmptyHintDetail.Text = _seriesCache.Count == 0
+            ? "测试连接后选择库，点「加载系列」"
+            : "当前筛选/过滤条件没有匹配的系列";
+    }
 
     // ================= 事件装配 =================
 
@@ -128,6 +154,11 @@ public sealed partial class MainWindow : Window
             if (e.Key == Key.Enter) { _ = SearchAllLibrariesAsync(); e.Handled = true; }
         };
         BtnEditSeries.Click += async (_, _) => await EditSeriesEntryAsync();
+        BtnTheme.Click += (_, _) =>
+        {
+            var dark = Application.Current!.RequestedThemeVariant == ThemeVariant.Dark;
+            ApplyTheme(!dark, persist: true);
+        };
 
         ChkDryRun.PropertyChanged += (_, e) =>
         {

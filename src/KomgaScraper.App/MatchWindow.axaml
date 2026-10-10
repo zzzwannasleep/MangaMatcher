@@ -5,7 +5,7 @@
         Width="1180" Height="620" MinWidth="900" MinHeight="480"
         WindowStartupLocation="CenterOwner"
         FontFamily="Microsoft YaHei UI, PingFang SC, Segoe UI"
-        Background="#F3F3F7">
+        Background="{DynamicResource AppBgBrush}">
     <Grid RowDefinitions="*,Auto">
         <Grid Grid.Row="0" ColumnDefinitions="*,310">
             <!-- 左：候选卡片流（按来源分组） -->
@@ -14,16 +14,16 @@
             </ScrollViewer>
 
             <!-- 右：详情面板（选之前就能确认是不是这部） -->
-            <Border Grid.Column="1" Margin="0,8,8,8" Background="White" CornerRadius="8"
-                    BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" Padding="8">
+            <Border Grid.Column="1" Margin="0,8,8,8" Background="{DynamicResource CardBgBrush}" CornerRadius="8"
+                    BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8">
                 <Grid RowDefinitions="Auto,Auto,*">
-                    <Border Grid.Row="0" Height="250" Background="#F2F2F5" CornerRadius="6" ClipToBounds="True">
+                    <Border Grid.Row="0" Height="250" Background="{DynamicResource PlaceholderBgBrush}" CornerRadius="6" ClipToBounds="True">
                         <Image x:Name="DetailImage" Stretch="Uniform" />
                     </Border>
                     <TextBox x:Name="DetailMeta" Grid.Row="1" Height="100" IsReadOnly="True" AcceptsReturn="True"
                              TextWrapping="Wrap" Margin="0,8,0,0" BorderThickness="0" Background="Transparent" />
                     <ScrollViewer Grid.Row="2" Margin="0,8,0,0">
-                        <TextBlock x:Name="DetailSummary" TextWrapping="Wrap" Foreground="#333" />
+                        <TextBlock x:Name="DetailSummary" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" />
                     </ScrollViewer>
                 </Grid>
             </Border>

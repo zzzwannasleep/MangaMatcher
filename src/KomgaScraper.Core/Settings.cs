@@ -58,6 +58,8 @@ public sealed class AppSettings
     [JsonPropertyName("dryRun")] public bool DryRun { get; set; } = true;
     [JsonPropertyName("lastLibraryId")] public string LastLibraryId { get; set; } = "";
     [JsonPropertyName("mylarOutputDir")] public string MylarOutputDir { get; set; } = "";
+    /// <summary>界面主题："light" / "dark"（状态栏月亮/太阳按钮切换，重启保留）。</summary>
+    [JsonPropertyName("theme")] public string Theme { get; set; } = "light";
 
     /// <summary>标记白名单：文件夹名后缀命中即保留为标签（内置词表认不出的也能按用户口径落）。</summary>
     [JsonPropertyName("tagWhitelist")] public List<string> TagWhitelist { get; set; } = [];

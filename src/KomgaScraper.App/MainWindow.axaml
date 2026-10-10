@@ -7,7 +7,7 @@
         Width="1240" Height="820" MinWidth="780" MinHeight="560"
         WindowStartupLocation="CenterScreen"
         FontFamily="Microsoft YaHei UI, PingFang SC, Segoe UI"
-        Background="#F3F3F7">
+        Background="{DynamicResource AppBgBrush}">
 
     <!-- 最外层 Panel：承载内容 + 忙碌遮罩 + Toast 通知层 -->
     <Panel>
@@ -29,7 +29,7 @@
                                 <TextBox x:Name="TxtApiKey" />
                                 <Grid ColumnDefinitions="*,*,8" Margin="0,6,0,0">
                                     <Button x:Name="BtnTest" Grid.Column="0" Content="测试连接" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
-                                    <Button x:Name="BtnSettings" Grid.Column="1" Content="⚙ 设置" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                    <Button x:Name="BtnSettings" Grid.Column="1" Content="设置" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -39,7 +39,7 @@
                             <StackPanel Spacing="2">
                                 <TextBlock Classes="groupTitle" Text="② 加载与列表" />
                                 <TextBlock Classes="fieldLabel" Text="库" />
-                                <ComboBox x:Name="CmbLibrary" HorizontalAlignment="Stretch" PlaceholderText="先测试连接">
+                                <ComboBox x:Name="CmbLibrary" HorizontalAlignment="Stretch" PlaceholderText="连接后选择库">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate>
                                     </ComboBox.ItemTemplate>
@@ -58,9 +58,9 @@
                                     <ComboBoxItem Content="已完整（封面+简介）" />
                                 </ComboBox>
                                 <TextBlock Classes="fieldLabel" Text="过滤" />
-                                <TextBox x:Name="TxtFilter" Watermark="过滤标题…" />
+                                <TextBox x:Name="TxtFilter" Watermark="按标题过滤…" />
                                 <TextBlock Classes="fieldLabel" Text="全库搜索" />
-                                <TextBox x:Name="TxtSearch" Watermark="输入漫画名回车…" />
+                                <TextBox x:Name="TxtSearch" Watermark="输入漫画名，回车搜索…" />
                                 <Grid ColumnDefinitions="*,*,8" Margin="0,6,0,0">
                                     <Button x:Name="BtnSearchSeries" Grid.Column="0" Content="搜索全库" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
                                     <Button x:Name="BtnEditSeries" Grid.Column="1" Content="编辑单部" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
@@ -107,10 +107,10 @@
                     <Panel Grid.Row="0">
                         <DataGrid x:Name="SeriesGrid"
                                   AutoGenerateColumns="False" CanUserResizeColumns="True"
-                                  GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#ECECF2"
+                                  GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource GridLinesBrush}"
                                   HeadersVisibility="Column" SelectionMode="Extended"
-                                  Background="White" RowBackground="Transparent"
-                                  BorderThickness="1" BorderBrush="{StaticResource CardBorderBrush}" CornerRadius="8"
+                                  Background="{DynamicResource CardBgBrush}" RowBackground="Transparent"
+                                  BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}" CornerRadius="8"
                                   DoubleTapped="OnSeriesDoubleTapped" Sorting="OnSeriesSorting">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Width="38" CanUserSort="False" CanUserResize="False">
@@ -120,14 +120,14 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="31*" IsReadOnly="True" />
-                                <DataGridTextColumn Header="文件夹名" Binding="{Binding Folder}" Width="19*" IsReadOnly="True" />
-                                <DataGridTextColumn Header="册数" Binding="{Binding Count}" Width="6*" IsReadOnly="True" />
-                                <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="7*" IsReadOnly="True" />
-                                <DataGridTextColumn Header="链接" Binding="{Binding Link}" Width="6*" IsReadOnly="True" />
-                                <DataGridTextColumn Header="封面" Binding="{Binding Cover}" Width="5*" IsReadOnly="True" />
-                                <DataGridTextColumn Header="简介" Binding="{Binding Summary}" Width="5*" IsReadOnly="True" />
-                                <DataGridTextColumn Header="BGM ID" Binding="{Binding BgmId}" Width="21*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="30*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="文件夹名" Binding="{Binding Folder}" Width="18*" IsReadOnly="True" MinWidth="64" />
+                                <DataGridTextColumn Header="册数" Binding="{Binding Count}" Width="74" IsReadOnly="True" />
+                                <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="74" IsReadOnly="True" />
+                                <DataGridTextColumn Header="链接" Binding="{Binding Link}" Width="74" IsReadOnly="True" />
+                                <DataGridTextColumn Header="封面" Binding="{Binding Cover}" Width="74" IsReadOnly="True" />
+                                <DataGridTextColumn Header="简介" Binding="{Binding Summary}" Width="74" IsReadOnly="True" />
+                                <DataGridTextColumn Header="BGM ID" Binding="{Binding BgmId}" Width="22*" IsReadOnly="True" MinWidth="64" />
                             </DataGrid.Columns>
                         </DataGrid>
                         <!-- 拖拽框选覆盖层（橡皮筋；跨平台：Win/Mac 左键拖拽行为一致） -->
@@ -135,17 +135,28 @@
                             <Rectangle x:Name="BandRect" Fill="#265B5BD6" Stroke="#5B5BD6" StrokeThickness="1"
                                        StrokeDashArray="3,3" IsVisible="False" />
                         </Canvas>
+                        <!-- 空态：未加载/无匹配时的占位说明（随主题变色） -->
+                        <Border x:Name="EmptyHint" IsHitTestVisible="False" Background="Transparent"
+                                HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                                <TextBlock Text="列表为空" HorizontalAlignment="Center" FontWeight="SemiBold"
+                                           FontSize="15" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock x:Name="EmptyHintDetail" Text="测试连接后选择库，点「加载系列」"
+                                           HorizontalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource TextTertiaryBrush}" />
+                            </StackPanel>
+                        </Border>
                     </Panel>
 
-                    <GridSplitter Grid.Row="1" Height="5" Background="#D0D0DA" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" />
+                    <GridSplitter Grid.Row="1" Height="5" Background="{DynamicResource SplitterBrush}" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" />
 
                     <ListBox x:Name="LogList" Grid.Row="2">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" Margin="0,1">
-                                    <TextBlock Text="{Binding Time}" Foreground="#787880" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Time}" Foreground="{DynamicResource LogTimeBrush}" Margin="0,0,6,0" />
                                     <TextBlock Text="{Binding Level}" Foreground="{Binding LevelForeground}" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                    <TextBlock Text="{Binding Message}" Foreground="#B8FFC9" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Message}" Foreground="{DynamicResource LogFgBrush}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -154,12 +165,21 @@
             </Grid>
 
             <!-- ================= 状态栏 ================= -->
-            <Border Grid.Row="1" Background="#E9E9F0" BorderBrush="#D8D8E0" BorderThickness="0,1,0,0" Padding="12,5">
-                <Grid ColumnDefinitions="*,Auto,Auto,10,Auto,Auto">
-                    <TextBlock x:Name="StatusText" Text="未连接" VerticalAlignment="Center" FontSize="12" />
-                    <ProgressBar x:Name="Progress" Grid.Column="2" Width="260" Height="10" IsVisible="False" VerticalAlignment="Center" />
-                    <TextBlock x:Name="StatusChanges" Grid.Column="4" Text="改动 0" VerticalAlignment="Center" FontSize="12" Foreground="#666" />
-                    <TextBlock Grid.Column="5" Text="Avalonia · 跨平台" VerticalAlignment="Center" FontSize="11" Foreground="#A0A0B0" />
+            <Border Grid.Row="1" Background="{DynamicResource StatusBarBgBrush}"
+                    BorderBrush="{DynamicResource StatusBarBorderBrush}" BorderThickness="0,1,0,0" Padding="12,5">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <TextBlock x:Name="StatusText" Text="未连接" VerticalAlignment="Center" FontSize="12" />
+                        <ProgressBar x:Name="Progress" Width="260" Height="10" IsVisible="False" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                        <TextBlock x:Name="StatusChanges" Text="改动 0" VerticalAlignment="Center" FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <Button x:Name="BtnTheme" Classes="app" MinHeight="24" MinWidth="30" Padding="4,1"
+                                FontSize="13" Content="🌙" ToolTip.Tip="切换深色 / 浅色模式" />
+                        <TextBlock Text="跨平台版" VerticalAlignment="Center" FontSize="11"
+                                   Foreground="{DynamicResource TextTertiaryBrush}" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>
@@ -174,7 +194,7 @@
                         </Ellipse.RenderTransform>
                     </Ellipse>
                 </Panel>
-                <TextBlock x:Name="BusyText" Text="任务执行中…" Foreground="#333" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock x:Name="BusyText" Text="任务执行中…" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
             </StackPanel>
         </Border>
 

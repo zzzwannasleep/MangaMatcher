@@ -24,21 +24,21 @@ public sealed class SettingsWindow : Window
     private readonly TextBox _txtBgmToken = new();
     private readonly ComboBox _cmbProxyScheme = new() { MinWidth = 160 };
     private readonly TextBox _txtProxyHost = new() { Watermark = "127.0.0.1 或 proxy.example.com", MinWidth = 170 };
-    private readonly NumericUpDown _numProxyPort = new() { Minimum = 1, Maximum = 65535, Value = 7890, Width = 90 };
+    private readonly NumericUpDown _numProxyPort = new() { Minimum = 1, Maximum = 65535, Value = 7890, Width = 110 };
     private readonly TextBox _txtProxyUser = new();
     private readonly TextBox _txtProxyPass = new() { PasswordChar = '●' };
     private readonly TextBox _txtBkwkUrl = new();
     private readonly Button _btnBwDownload = new() { Content = "直接下载建索引", Classes = { "app" } };
     private readonly Button _btnBwOpen = new() { Content = "打开下载页", Classes = { "app" } };
     private readonly Button _btnBwImport = new() { Content = "导入本地文件…", Classes = { "app" } };
-    private readonly TextBlock _lblBwStatus = new() { Foreground = Brushes.DimGray, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _lblBwStatus = new() { VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _chkAi = new() { Content = "启用（OpenAI 兼容接口）" };
     private readonly CheckBox _chkAiTranslate = new() { Content = "翻译简介（日文/英文简介自动翻译成中文）" };
     private readonly TextBox _txtAiBase = new();
     private readonly TextBox _txtAiKey = new();
     private readonly TextBox _txtAiModel = new();
     private readonly ComboBox _cmbMatchType = new() { MinWidth = 160, ItemsSource = new[] { "漫画", "小说" } };
-    private readonly NumericUpDown _numConcurrency = new() { Minimum = 1, Maximum = 8, Value = 3, Width = 80 };
+    private readonly NumericUpDown _numConcurrency = new() { Minimum = 1, Maximum = 8, Value = 3, Width = 100 };
     private readonly CheckBox _chkVolumeData = new() { Content = "抓取每卷详情（简介/日期/ISBN）" };
     private readonly CheckBox _chkForceRefresh = new() { Content = "强制刷新已有 Btv 链接的系列" };
     private readonly CheckBox _chkBwTags = new() { Content = "写入类型/题材标签、阅读方向（来自 BookWalker）" };
@@ -93,6 +93,7 @@ public sealed class SettingsWindow : Window
         _txtTagWhitelist.Text = string.Join("\r\n", current.TagWhitelist);
         _txtTagBlacklist.Text = string.Join("\r\n", current.TagBlacklist);
         _lblBwStatus.Text = File.Exists(AppSettings.BkwkIndexPath) ? "索引已存在 ✓" : "尚未下载";
+        Ui.BindTheme(_lblBwStatus, TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
         BuildGrid();
 
@@ -169,14 +170,15 @@ public sealed class SettingsWindow : Window
     private void Section(string title)
     {
         NextRow();
-        AddToGrid(new TextBlock
+        var t = new TextBlock
         {
             Text = title,
             FontWeight = FontWeight.Bold,
             FontSize = 13,
-            Foreground = new SolidColorBrush(Color.Parse("#335294")),
             Margin = new Thickness(2, 14, 2, 4),
-        }, 0, 2);
+        };
+        Ui.BindTheme(t, TextBlock.ForegroundProperty, "AccentBrush");
+        AddToGrid(t, 0, 2);
     }
 
     private void Field(string label, Control input)
@@ -198,16 +200,17 @@ public sealed class SettingsWindow : Window
     private void Hint(string text)
     {
         NextRow();
-        AddToGrid(new TextBlock
+        var h = new TextBlock
         {
             Text = text,
-            Foreground = Brushes.DimGray,
             FontSize = 11.5,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(2, 2, 2, 2),
             MaxWidth = 480,
             HorizontalAlignment = HorizontalAlignment.Left,
-        }, 0, 2);
+        };
+        Ui.BindTheme(h, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        AddToGrid(h, 0, 2);
     }
 
     private void BuildGrid()
@@ -245,13 +248,14 @@ public sealed class SettingsWindow : Window
         Field("Komga 代理", _chkKomgaProxy);
         var concRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
         concRow.Children.Add(_numConcurrency);
-        concRow.Children.Add(new TextBlock
+        var concHint = new TextBlock
         {
             Text = "个系列同时刮削（1 = 逐个）",
             VerticalAlignment = VerticalAlignment.Center,
-            Foreground = Brushes.DimGray,
             FontSize = 12,
-        });
+        };
+        Ui.BindTheme(concHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        concRow.Children.Add(concHint);
         Field("批量并发", concRow);
 
         Section("版本标记（黑白名单）");
@@ -449,6 +453,7 @@ public sealed class SettingsWindow : Window
         BwWriteTags = _chkBwTags.IsChecked == true,
         ForceRefreshBtv = _chkForceRefresh.IsChecked == true,
         DryRun = _current.DryRun,
+        Theme = _current.Theme,
         LastLibraryId = _current.LastLibraryId,
         MylarOutputDir = _current.MylarOutputDir,
         TagWhitelist = SplitLines(_txtTagWhitelist.Text ?? ""),

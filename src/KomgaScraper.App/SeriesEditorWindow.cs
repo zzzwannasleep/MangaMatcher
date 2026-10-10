@@ -90,7 +90,7 @@ public sealed class SeriesEditorWindow : Window
     private readonly Button _btnPickBookCover = new() { Content = "选图换卷封面…", MinHeight = 26, Classes = { "app" } };
     private readonly Button _btnRescrapeVolumes = new() { Content = "重刮每卷（按卷号对齐）", Classes = { "app" }, MinHeight = 30 };
     private readonly Button _btnSaveSeries = new() { Content = "保存系列信息", Classes = { "primary" }, MinHeight = 32 };
-    private readonly TextBlock _statusText = new() { Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _statusText = new() { VerticalAlignment = VerticalAlignment.Center };
     private readonly ObservableCollection<BookRow> _bookRows = [];
 
     /// <summary>编辑器对库的写入 → 主界面日志框。</summary>
@@ -122,15 +122,19 @@ public sealed class SeriesEditorWindow : Window
 
     // ================= UI 构建 =================
 
-    private static TextBlock Lbl(string t, bool right = false) => new()
+    private static TextBlock Lbl(string t, bool right = false)
     {
-        Text = t,
-        FontSize = 12,
-        Foreground = Brushes.DimGray,
-        VerticalAlignment = VerticalAlignment.Center,
-        HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-        Margin = new Thickness(1, 5, 6, 2),
-    };
+        var l = new TextBlock
+        {
+            Text = t,
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+            Margin = new Thickness(1, 5, 6, 2),
+        };
+        Ui.BindTheme(l, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        return l;
+    }
 
     private void BuildUi()
     {
@@ -140,13 +144,13 @@ public sealed class SeriesEditorWindow : Window
         var coverPanel = new Grid { RowDefinitions = new RowDefinitions("*,30,26,26") };
         var coverBorder = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#F5F5F5")),
-            BorderBrush = new SolidColorBrush(Color.Parse("#D8D8E0")),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
             ClipToBounds = true,
             Child = _picSeriesCover,
         };
+        Ui.BindTheme(coverBorder, Border.BackgroundProperty, "PlaceholderBgBrush");
+        Ui.BindTheme(coverBorder, Border.BorderBrushProperty, "CardBorderBrush");
         Grid.SetColumn(coverBorder, 0);
         Grid.SetRow(coverBorder, 0);
         coverPanel.Children.Add(coverBorder);
@@ -206,12 +210,13 @@ public sealed class SeriesEditorWindow : Window
         InfoRow(Lbl("发售日期"), _txtReleaseDate, Lbl("总卷数", true), _txtTotalBooks);
         Span2(_txtAgeRating, Lbl("分级"));
         Span2(_txtSummary, Lbl("简介"));
-        Span2(new TextBlock
+        var fieldHint = new TextBlock
         {
             Text = "清空文本框并保存 = 清空该字段",
-            Foreground = Brushes.Gray,
             FontSize = 11,
-        }, new TextBlock { Text = "" });
+        };
+        Ui.BindTheme(fieldHint, TextBlock.ForegroundProperty, "TextTertiaryBrush");
+        Span2(fieldHint, new TextBlock { Text = "" });
 
         var tabInfo = new TabItem
         {
@@ -261,10 +266,10 @@ public sealed class SeriesEditorWindow : Window
         var machineHint = new TextBlock
         {
             Text = "MACHINE 标签保存时自动补，无需手写。",
-            Foreground = Brushes.Gray,
             FontSize = 11,
             Margin = new Thickness(1, 8, 0, 0),
         };
+        Ui.BindTheme(machineHint, TextBlock.ForegroundProperty, "TextTertiaryBrush");
         Grid.SetColumn(machineHint, 1);
         Grid.SetRow(machineHint, 5);
         tagsGrid.Children.Add(machineHint);
@@ -278,10 +283,10 @@ public sealed class SeriesEditorWindow : Window
         _lvBooks.AutoGenerateColumns = false;
         _lvBooks.HeadersVisibility = DataGridHeadersVisibility.Column;
         _lvBooks.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
-        _lvBooks.HorizontalGridLinesBrush = new SolidColorBrush(Color.Parse("#ECECF2"));
-        _lvBooks.Background = Brushes.White;
+        Ui.BindTheme(_lvBooks, DataGrid.HorizontalGridLinesBrushProperty, "GridLinesBrush");
+        Ui.BindTheme(_lvBooks, DataGrid.BackgroundProperty, "CardBgBrush");
         _lvBooks.BorderThickness = new Thickness(1);
-        _lvBooks.BorderBrush = new SolidColorBrush(Color.Parse("#D8D8E0"));
+        Ui.BindTheme(_lvBooks, DataGrid.BorderBrushProperty, "CardBorderBrush");
         _lvBooks.CornerRadius = new CornerRadius(6);
         _lvBooks.SelectionMode = DataGridSelectionMode.Single;
         _lvBooks.ItemsSource = _bookRows;
@@ -298,24 +303,25 @@ public sealed class SeriesEditorWindow : Window
 
         var bookTools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         bookTools.Children.Add(_btnRescrapeVolumes);
-        bookTools.Children.Add(new TextBlock
+        var dryHint = new TextBlock
         {
             Text = "遵循主界面 Dry-run 开关",
-            Foreground = Brushes.Gray,
             FontSize = 11.5,
             VerticalAlignment = VerticalAlignment.Center,
-        });
+        };
+        Ui.BindTheme(dryHint, TextBlock.ForegroundProperty, "TextTertiaryBrush");
+        bookTools.Children.Add(dryHint);
 
         var bookCoverPanel = new Grid { RowDefinitions = new RowDefinitions("*,30") };
         var bookCoverBorder = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#F5F5F5")),
-            BorderBrush = new SolidColorBrush(Color.Parse("#D8D8E0")),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
             ClipToBounds = true,
             Child = _picBookCover,
         };
+        Ui.BindTheme(bookCoverBorder, Border.BackgroundProperty, "PlaceholderBgBrush");
+        Ui.BindTheme(bookCoverBorder, Border.BorderBrushProperty, "CardBorderBrush");
         bookCoverPanel.Children.Add(bookCoverBorder);
         Grid.SetRow(_btnPickBookCover, 1);
         bookCoverPanel.Children.Add(_btnPickBookCover);
@@ -833,7 +839,12 @@ public sealed class SeriesEditorWindow : Window
     private void SetStatus(string text, bool error)
     {
         _statusText.Text = text;
-        _statusText.Foreground = new SolidColorBrush(Color.Parse(error ? "#B22222" : "#808080"));
+        var app = Application.Current;
+        IBrush? fg = null;
+        if (app != null && app.Resources.TryGetResource(
+                error ? "ErrorBrush" : "TextSecondaryBrush", app.ActualThemeVariant, out var res))
+            fg = res as IBrush;
+        _statusText.Foreground = fg ?? Brushes.Gray;
     }
 
     /// <summary>"a，b、c , d" → ["a","b","c","d"]。</summary>

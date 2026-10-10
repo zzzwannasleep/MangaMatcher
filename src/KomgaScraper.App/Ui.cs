@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
@@ -14,6 +15,12 @@ namespace KomgaScraper.App;
 /// </summary>
 internal static class Ui
 {
+    /// <summary>
+    /// 把控件属性绑定到主题资源（App.axaml 主题词典里的 key）。
+    /// 深色/浅色切换时 DynamicResource 字典变化，绑定自动跟随——比取快照式取色可靠。
+    /// </summary>
+    public static void BindTheme(AvaloniaObject c, AvaloniaProperty property, string key)
+        => c.Bind(property, Application.Current!.Resources.GetResourceObservable(key).ToBinding());
     /// <summary>模态消息框。okOnly=true 只有确定；否则 确定/取消。返回 true=确定。</summary>
     public static Task<bool> MessageAsync(Window? owner, string message, string title = "提示", bool okOnly = false, bool error = false)
     {
@@ -58,11 +65,13 @@ internal static class Ui
         var panel = new StackPanel { Spacing = 2 };
         if (error)
         {
-            panel.Children.Add(new TextBlock
+            var cross = new TextBlock
             {
-                Text = "✕", Foreground = new SolidColorBrush(Color.Parse("#D13438")),
-                FontWeight = FontWeight.Bold, Margin = new Thickness(20, 14, 0, -10), FontSize = 16,
-            });
+                Text = "✕", FontWeight = FontWeight.Bold,
+                Margin = new Thickness(20, 14, 0, -10), FontSize = 16,
+            };
+            BindTheme(cross, TextBlock.ForegroundProperty, "ErrorBrush");
+            panel.Children.Add(cross);
         }
         panel.Children.Add(msg);
         panel.Children.Add(buttons);

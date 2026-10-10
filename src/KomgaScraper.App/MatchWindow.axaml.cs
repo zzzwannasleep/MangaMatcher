@@ -72,13 +72,14 @@ public sealed partial class MatchWindow : Window
 
     private void AddRawGroup(string label, List<SearchCandidate> group)
     {
-        CardsPanel.Children.Add(new TextBlock
+        var groupLabel = new TextBlock
         {
             Text = $"{label}（{group.Count}）",
             FontWeight = FontWeight.SemiBold,
-            Foreground = Avalonia.Media.Brushes.DimGray,
             Margin = new Thickness(2, 8, 0, 4),
-        });
+        };
+        Ui.BindTheme(groupLabel, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        CardsPanel.Children.Add(groupLabel);
         var wrap = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
         foreach (var c in group) wrap.Children.Add(BuildCard(c));
         CardsPanel.Children.Add(wrap);
@@ -104,10 +105,10 @@ public sealed partial class MatchWindow : Window
         {
             Text = Truncate(c.Author, 12),
             FontSize = 11,
-            Foreground = Avalonia.Media.Brushes.DimGray,
             TextAlignment = Avalonia.Media.TextAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
+        Ui.BindTheme(author, TextBlock.ForegroundProperty, "TextSecondaryBrush");
         var box = new Border
         {
             Classes = { "card" },
