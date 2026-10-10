@@ -2,21 +2,34 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <!-- net8.0-windows：仅为了保留"资源管理器定位文件"的 Shell COM 互操作（跨平台 UI，Windows 专属增强） -->
     <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
     <RootNamespace>KomgaScraper.App</RootNamespace>
     <AssemblyName>KomgaScraper</AssemblyName>
     <ApplicationIcon>App.ico</ApplicationIcon>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <InvariantGlobalization>false</InvariantGlobalization>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.0" Condition="'$(Configuration)' == 'Debug'" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\KomgaScraper.Core\KomgaScraper.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="App.ico" />
   </ItemGroup>
 
 </Project>

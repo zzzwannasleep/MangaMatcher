@@ -43,25 +43,31 @@ jobs:
             [ -n "$proj" ] && dotnet build "$proj" -c Release
           done
 
-      - name: Publish CLI (osx-arm64)
+      - name: Publish GUI (osx-arm64)
         run: >
-          dotnet publish tools/TestCli/TestCli.csproj
-          -c Release -r osx-arm64 --self-contained true
+          dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj
+          -c Release -r osx-arm64 --self-contained false
           -p:PublishSingleFile=true
+          -p:EnableWindowsTargeting=true
           -p:Version=${{ env.version }}
           -p:InformationalVersion=${{ env.version }}
 
-      - name: Publish CLI (osx-x64)
+      - name: Publish GUI (osx-x64)
         run: >
-          dotnet publish tools/TestCli/TestCli.csproj
-          -c Release -r osx-x64 --self-contained true
+          dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj
+          -c Release -r osx-x64 --self-contained false
           -p:PublishSingleFile=true
+          -p:EnableWindowsTargeting=true
           -p:Version=${{ env.version }}
           -p:InformationalVersion=${{ env.version }}
 
       - name: Package
         run: |
-          cd tools/TestCli/bin/Release/net8.0/osx-arm64/publish
+          cd src/KomgaScraper.App/bin/Release/net8.0-windows/osx-arm64/publish
+          zip -qr "$GITHUB_WORKSPACE/KomgaScraper-${{ env.version }}-macos-arm64.zip" .
+          cd "$GITHUB_WORKSPACE/src/KomgaScraper.App/bin/Release/net8.0-windows/osx-x64/publish"
+          zip -qr "$GITHUB_WORKSPACE/KomgaScraper-${{ env.version }}-macos-x64.zip" .
+          cd "$GITHUB_WORKSPACE/tools/TestCli/bin/Release/net8.0/osx-arm64/publish"
           zip -qr "$GITHUB_WORKSPACE/KomgaScraper-CLI-${{ env.version }}-osx-arm64.zip" .
           cd "$GITHUB_WORKSPACE/tools/TestCli/bin/Release/net8.0/osx-x64/publish"
           zip -qr "$GITHUB_WORKSPACE/KomgaScraper-CLI-${{ env.version }}-osx-x64.zip" .
@@ -69,6 +75,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: macos-cli-${{ env.version }}
-          path: KomgaScraper-CLI-*.zip
+          name: macos-${{ env.version }}
+          path: |
+            KomgaScraper-*-macos-*.zip
+            KomgaScraper-CLI-*.zip
           if-no-files-found: error

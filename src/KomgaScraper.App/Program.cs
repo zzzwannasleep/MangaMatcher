@@ -1,6 +1,9 @@
+using Avalonia;
+using System;
+
 namespace KomgaScraper.App;
 
-static class Program
+internal static class Program
 {
     /// <summary>未处理异常写进文件日志（格式对齐界面日志，导出日志时一并带走）。</summary>
     private static void TryLogUnhandled(Exception ex)
@@ -16,36 +19,27 @@ static class Program
     }
 
     [STAThread]
-    static void Main(string[] args)
+    public static void Main(string[] args)
     {
-        ApplicationConfiguration.Initialize();
-        // 全局异常兜底：任何未处理异常只弹友好提示，不出 JIT 调试对话框；
-        // 同时落到 data\logs\log-日期.log——之前只弹窗不记录，出了问题无从排查
-        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) =>
-        {
-            TryLogUnhandled(e.Exception);
-            MessageBox.Show(e.Exception.Message, "发生错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        };
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
-            if (e.ExceptionObject is Exception ex)
-            {
-                TryLogUnhandled(ex);
-                MessageBox.Show(ex.Message, "发生严重错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            if (e.ExceptionObject is Exception ex) TryLogUnhandled(ex);
         };
+        TaskScheduler.UnobservedTaskException += (_, e) => TryLogUnhandled(e.Exception);
 
-        if (args.Contains("--dev-settings"))
+        try
         {
-            // 开发自检：主窗口 + 非模态设置对话框同时展示，便于截图
-            var form = new MainForm();
-            form.Load += (_, _) => form.ShowSettingsDev();
-            Application.Run(form);
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
-        else
+        catch (Exception ex)
         {
-            Application.Run(new MainForm());
+            TryLogUnhandled(ex);
+            throw;
         }
     }
+
+    public static AppBuilder BuildAvaloniaApp()
+        => AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .LogToTrace();
 }

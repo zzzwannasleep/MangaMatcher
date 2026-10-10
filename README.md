@@ -10,6 +10,8 @@
 [![Stars](https://img.shields.io/github/stars/zzzwannasleep/MangaMatcher?style=flat-square&color=ffd700)](https://github.com/zzzwannasleep/MangaMatcher/stargazers)
 [![License](https://img.shields.io/github/license/zzzwannasleep/MangaMatcher?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=flat-square)](#)
+[![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey?style=flat-square)](#)
+[![UI](https://img.shields.io/badge/UI-Avalonia%2011-9B4F96?style=flat-square)](#)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512bd4?style=flat-square)](#)
 [![Language](https://img.shields.io/badge/C%23-12-178600?style=flat-square)](#)
 
@@ -31,6 +33,7 @@
 | 🏷 **版本标记** | 爱藏版/完全版等后缀自动落标签，多版本系列不再刮平 |
 | 📦 **Mylar 导出** | `series.json` 导出 + 文件夹打标（MACHINE 标签可追溯） |
 | 💚 **绿色便携** | 不写注册表不写 %APPDATA%，整目录复制即迁移 |
+| 🎨 **现代 UI** | Avalonia 跨平台界面：hover 浮起 / 窗口淡入 / 忙碌脉冲 / Toast 通知全套动效 |
 
 ## 🚀 快速开始
 
@@ -50,7 +53,7 @@
 dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
 ```
 
-推送到 `main` 自动触发云端构建：Windows 单文件版发布到 [Releases](https://github.com/zzzwannasleep/MangaMatcher/releases)（每次构建一个小版本，`0.0.1`、`0.0.2` …步进）；macOS 上同时验证跨平台代码并产出 CLI（osx-arm64 / osx-x64）构建产物（GUI 版为 WinForms，仅支持 Windows）。
+推送到 `main` 自动触发云端构建：Windows / macOS 双平台产物随构建自动步进小版本（`0.0.1`、`0.0.2` …）——Windows 版发布到 [Releases](https://github.com/zzzwannasleep/MangaMatcher/releases)，macOS 版在 Actions Artifacts 产出（arm64 + x64）。UI 基于 Avalonia 11，三端同一份代码。
 
 ## 📄 许可
 

@@ -1,0 +1,177 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:KomgaScraper.App"
+        x:Class="KomgaScraper.App.MainWindow"
+        x:DataType="vm:MainWindow"
+        Title="KomgaScraper — Komga 漫画元数据刮削（Bangumi）"
+        Width="1240" Height="820" MinWidth="780" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, PingFang SC, Segoe UI"
+        Background="#F3F3F7">
+
+    <!-- 最外层 Panel：承载内容 + 忙碌遮罩 + Toast 通知层 -->
+    <Panel>
+        <Grid RowDefinitions="*,Auto">
+
+            <Grid Grid.Row="0" ColumnDefinitions="320,*">
+
+                <!-- ================= 左侧操作栏（固定宽度，内容超高滚动） ================= -->
+                <ScrollViewer Grid.Column="0" Margin="8,8,4,4" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="9">
+
+                        <!-- ① 连接 Komga -->
+                        <Border Classes="group">
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="groupTitle" Text="① 连接 Komga" />
+                                <TextBlock Classes="fieldLabel" Text="Komga 地址" />
+                                <TextBox x:Name="TxtUrl" Watermark="http://localhost:25600" />
+                                <TextBlock Classes="fieldLabel" Text="API Key" />
+                                <TextBox x:Name="TxtApiKey" />
+                                <Grid ColumnDefinitions="*,*,8" Margin="0,6,0,0">
+                                    <Button x:Name="BtnTest" Grid.Column="0" Content="测试连接" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                    <Button x:Name="BtnSettings" Grid.Column="1" Content="⚙ 设置" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ② 加载与列表 -->
+                        <Border Classes="group">
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="groupTitle" Text="② 加载与列表" />
+                                <TextBlock Classes="fieldLabel" Text="库" />
+                                <ComboBox x:Name="CmbLibrary" HorizontalAlignment="Stretch" PlaceholderText="先测试连接">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button x:Name="BtnLoad" Content="加载系列" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                                <CheckBox x:Name="ChkDryRun" Content="Dry-run（不实际修改）" IsChecked="True" Margin="1,8,0,0" />
+                                <Button x:Name="BtnToggleAll" Content="全选" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                                <TextBlock Classes="fieldLabel" Text="筛选" />
+                                <ComboBox x:Name="CmbFilter" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                    <ComboBoxItem Content="全部" />
+                                    <ComboBoxItem Content="未刮削（无链接）" />
+                                    <ComboBoxItem Content="已刮削（有链接）" />
+                                    <ComboBoxItem Content="未刮封面" />
+                                    <ComboBoxItem Content="未刮简介" />
+                                    <ComboBoxItem Content="待补全（封面或简介缺）" />
+                                    <ComboBoxItem Content="已完整（封面+简介）" />
+                                </ComboBox>
+                                <TextBlock Classes="fieldLabel" Text="过滤" />
+                                <TextBox x:Name="TxtFilter" Watermark="过滤标题…" />
+                                <TextBlock Classes="fieldLabel" Text="全库搜索" />
+                                <TextBox x:Name="TxtSearch" Watermark="输入漫画名回车…" />
+                                <Grid ColumnDefinitions="*,*,8" Margin="0,6,0,0">
+                                    <Button x:Name="BtnSearchSeries" Grid.Column="0" Content="搜索全库" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                    <Button x:Name="BtnEditSeries" Grid.Column="1" Content="编辑单部" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ③ 刮削 -->
+                        <Border Classes="group">
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="groupTitle" Text="③ 刮削" />
+                                <CheckBox x:Name="ChkAuto" Content="全自动（不弹候选框）" Margin="1,0,0,2" />
+                                <Grid ColumnDefinitions="*,*,8" Margin="0,4,0,0">
+                                    <Button x:Name="BtnScrapeMeta" Grid.Column="0" Content="刮削元数据" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                    <Button x:Name="BtnScrapeAll" Grid.Column="1" Content="元数据+封面" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,*,8" Margin="0,4,0,0">
+                                    <Button x:Name="BtnCoverScrape" Grid.Column="0" Content="刮削封面" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                    <Button x:Name="BtnManualMatch" Grid.Column="1" Content="纠正匹配" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <Button x:Name="BtnRematch" Content="覆盖匹配（选错重刮）" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ④ 工具 -->
+                        <Border Classes="group">
+                            <StackPanel Spacing="2">
+                                <TextBlock Classes="groupTitle" Text="④ 工具" />
+                                <Button x:Name="BtnFolderTag" Content="文件夹名打标签" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                <Button x:Name="BtnMylarExport" Content="导出 series.json" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                                <Grid ColumnDefinitions="*,*,8" Margin="0,4,0,0">
+                                    <Button x:Name="BtnOpenData" Grid.Column="0" Content="打开数据目录" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                    <Button x:Name="BtnExportLog" Grid.Column="1" Content="导出日志" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <Button x:Name="BtnCancel" Content="取消当前任务" Classes="app" IsEnabled="False" Opacity="0.55" MinHeight="30" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ================= 右侧内容区：列表（上）+ 日志（下），中间可拖动 ================= -->
+                <Grid Grid.Column="1" Margin="4,8,8,4" RowDefinitions="62*,5,38*">
+                    <DataGrid x:Name="SeriesGrid" Grid.Row="0"
+                              AutoGenerateColumns="False" CanUserResizeColumns="True"
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#ECECF2"
+                              HeadersVisibility="Column" SelectionMode="Extended"
+                              Background="White" RowBackground="Transparent"
+                              BorderThickness="1" BorderBrush="{StaticResource CardBorderBrush}" CornerRadius="8"
+                              DoubleTapped="OnSeriesDoubleTapped" Sorting="OnSeriesSorting">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Width="38" CanUserSort="False" CanUserResize="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding Checked, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="31*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="文件夹名" Binding="{Binding Folder}" Width="19*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="册数" Binding="{Binding Count}" Width="6*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="7*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="链接" Binding="{Binding Link}" Width="6*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="封面" Binding="{Binding Cover}" Width="5*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="简介" Binding="{Binding Summary}" Width="5*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="BGM ID" Binding="{Binding BgmId}" Width="21*" IsReadOnly="True" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="1" Height="5" Background="#D0D0DA" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" />
+
+                    <ListBox x:Name="LogList" Grid.Row="2">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="0,1">
+                                    <TextBlock Text="{Binding Time}" Foreground="#787880" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Level}" Foreground="{Binding LevelForeground}" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding Message}" Foreground="#B8FFC9" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Grid>
+
+            <!-- ================= 状态栏 ================= -->
+            <Border Grid.Row="1" Background="#E9E9F0" BorderBrush="#D8D8E0" BorderThickness="0,1,0,0" Padding="12,5">
+                <Grid ColumnDefinitions="*,Auto,Auto,10,Auto,Auto">
+                    <TextBlock x:Name="StatusText" Text="未连接" VerticalAlignment="Center" FontSize="12" />
+                    <ProgressBar x:Name="Progress" Grid.Column="2" Width="260" Height="10" IsVisible="False" VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusChanges" Grid.Column="4" Text="改动 0" VerticalAlignment="Center" FontSize="12" Foreground="#666" />
+                    <TextBlock Grid.Column="5" Text="Avalonia · 跨平台" VerticalAlignment="Center" FontSize="11" Foreground="#A0A0B0" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 忙碌遮罩（任务执行时呼吸脉冲 + 旋转圈） -->
+        <Border x:Name="BusyOverlay" Classes="busyOverlay">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                <Panel Width="42" Height="42" HorizontalAlignment="Center">
+                    <Ellipse Classes="busySpinner">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </Panel>
+                <TextBlock x:Name="BusyText" Text="任务执行中…" Foreground="#333" FontWeight="SemiBold" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <!-- Toast 通知层 -->
+        <Panel x:Name="ToastHost" IsHitTestVisible="False" />
+    </Panel>
+</Window>
