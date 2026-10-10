@@ -228,6 +228,13 @@ public sealed partial class MainWindow : Window
             return;
         }
         if (!pt.Properties.IsLeftButtonPressed) return;
+        // 只在行上启用框选拦截：列头（含列宽拖块）与滚动条绝不抢捕获——
+        // 否则 DataGrid 原生拖拽失去鼠标捕获，列宽调节会退化成"点一下-滑动-再点一下"
+        var src = e.Source as Visual;
+        while (src is not null && src is not DataGridRow
+               && src is not Avalonia.Controls.Primitives.ScrollBar)
+            src = src.Parent as Visual;
+        if (src is not DataGridRow) return;
         _bandMaybe = true;
         _bandStart = pt.Position;
         e.Pointer.Capture(SeriesGrid);   // 统一捕获：拖出列表边界也能继续收 moved/released

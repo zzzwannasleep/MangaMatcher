@@ -5,6 +5,9 @@
 
     <Application.Resources>
         <ResourceDictionary>
+            <!-- 覆盖 DataGrid Fluent 主题：列头尾部强制预留 32px 排序图标区导致
+                 "列尾有空隙但表头文字被截断"。置 0 后排序时图标按自然宽度占位 -->
+            <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
 
             <!-- ================= 强调色（主题无关） ================= -->
             <SolidColorBrush x:Key="AccentBrush">#5B5BD6</SolidColorBrush>
@@ -148,18 +151,9 @@
         </Style>
 
         <!-- 按钮：hover 轻浮 + 按压缩放，120ms 缓动。
-             变换只作用于模板内容层（PART_ContentPresenter），按钮外框即命中区保持静止，
-             指针不会因位移反复进出 :pointerover → 修复悬浮时按钮闪烁 -->
-        <Style Selector="Button.app, Button.primary">
-            <Setter Property="Transitions">
-                <Setter.Value>
-                    <Transitions>
-                        <BrushTransition Property="Background" Duration="0:0:0.15" />
-                        <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
-                    </Transitions>
-                </Setter.Value>
-            </Setter>
-        </Style>
+             变换只作用于模板内容层（PART_ContentPresenter），按钮外框即命中区保持静止。
+             注意：颜色（Background/BorderBrush）不做过渡——BrushTransition 在样式回退时会从错误值插值，
+             表现为移开瞬间闪紫边/闪白，悬浮反馈一律瞬时切换 -->
         <Style Selector="Button.app /template/ ContentPresenter#PART_ContentPresenter, Button.primary /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Setter.Value>
@@ -215,16 +209,9 @@
             <Setter Property="Opacity" Value="0.45" />
         </Style>
 
-        <!-- 候选卡片：hover 阴影浮起 + 内容轻抬（变换作用于内容层，卡片外框命中区不动 → 不再闪），选中强调色描边 -->
+        <!-- 候选卡片：hover 阴影浮起 + 内容轻抬（变换作用于内容层，卡片外框命中区不动），选中强调色描边。
+             颜色一律瞬时切换（无 BrushTransition），避免移开时闪色 -->
         <Style Selector="Border.card">
-            <Setter Property="Transitions">
-                <Setter.Value>
-                    <Transitions>
-                        <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
-                    </Transitions>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="RenderTransform" Value="none" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1.5" />
             <Setter Property="CornerRadius" Value="8" />
@@ -277,19 +264,21 @@
             <Setter Property="Margin" Value="1,5,0,2" />
         </Style>
 
-        <!-- 列表行 hover 过渡 + 悬停底色（透明行保持选中态可读） -->
-        <Style Selector="DataGridRow">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.12" />
-                </Transitions>
-            </Setter>
-        </Style>
+        <!-- 列表行 hover 悬停底色：瞬时切换，不做 Background 过渡（移开时 BrushTransition 会闪白） -->
         <Style Selector="DataGridRow:not(.selected)">
             <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style Selector="DataGridRow:not(.selected):pointerover">
             <Setter Property="Background" Value="{DynamicResource RowHoverBrush}" />
+        </Style>
+        <!-- 单元格文本：省略号截断 + 覆盖 Fluent 主题内置 Margin 12px（文字离分隔线的"无形空隙"就是它） -->
+        <Style Selector="DataGridCell TextBlock">
+            <Setter Property="Margin" Value="6,0,6,0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- 列头内边距压缩：覆盖 Fluent 硬编码的 12,0,0,0 -->
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="Padding" Value="8,0,2,0" />
         </Style>
 
         <!-- 日志框（终端风，双主题各自配色） -->
