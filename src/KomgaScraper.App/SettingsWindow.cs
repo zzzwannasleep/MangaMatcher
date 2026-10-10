@@ -97,8 +97,17 @@ public sealed class SettingsWindow : Window
 
         BuildGrid();
 
-        var btnOk = new Button { Content = "保存", Classes = { "primary" }, MinWidth = 96, MinHeight = 32 };
-        var btnCancel = new Button { Content = "取消", Classes = { "app" }, MinWidth = 96, MinHeight = 32 };
+        // 按钮：宽度贴合文字 + 两轴文字居中（完全居中），不硬撑 MinWidth
+        var btnOk = new Button
+        {
+            Content = "保存", Classes = { "primary" }, MinHeight = 32,
+            Padding = new Thickness(20, 4), HorizontalContentAlignment = HorizontalAlignment.Center,
+        };
+        var btnCancel = new Button
+        {
+            Content = "取消", Classes = { "app" }, MinHeight = 32,
+            Padding = new Thickness(20, 4), HorizontalContentAlignment = HorizontalAlignment.Center,
+        };
         btnOk.Click += async (_, _) =>
         {
             // 代理填错就别让保存，否则会在运行时到处超时
@@ -113,16 +122,14 @@ public sealed class SettingsWindow : Window
         };
         btnCancel.Click += (_, _) => Close(false);
 
-        var btnPanel = new Grid
+        var btnPanel = new StackPanel
         {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto,12,Auto"),
-            Margin = new Thickness(0, 10, 12, 10),
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 12,
+            Margin = new Thickness(0, 10, 16, 12),
         };
-        Grid.SetColumn(btnOk, 1);
-        Grid.SetRow(btnOk, 0);
         btnPanel.Children.Add(btnOk);
-        Grid.SetColumn(btnCancel, 3);
-        Grid.SetRow(btnCancel, 0);
         btnPanel.Children.Add(btnCancel);
 
         var scroll = new ScrollViewer
@@ -205,12 +212,12 @@ public sealed class SettingsWindow : Window
             Text = text,
             FontSize = 11.5,
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(2, 2, 2, 2),
-            MaxWidth = 480,
+            Margin = new Thickness(0, 2, 8, 6),
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         Ui.BindTheme(h, TextBlock.ForegroundProperty, "TextSecondaryBrush");
-        AddToGrid(h, 0, 2);
+        // 与输入框同列（col 1）对齐 + 无 MaxWidth：跟真实列宽换行，绝不人为截断
+        AddToGrid(h, 1);
     }
 
     private void BuildGrid()
