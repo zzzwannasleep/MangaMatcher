@@ -1,0 +1,18 @@
+# Build artifacts
+bin/
+obj/
+dist/
+publish/
+out/
+
+# Archives
+*.zip
+
+# Rider/VS
+.idea/
+.vs/
+*.user
+*.suo
+
+# Logs
+*.log

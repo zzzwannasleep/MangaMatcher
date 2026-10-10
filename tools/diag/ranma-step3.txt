@@ -1,0 +1,472 @@
+﻿=== SERIES 0RVS45T1SZZZ2
+    books=38
+    book[0] number=01 numberSort=1.0 name=[高橋留美子][亂馬1／2][join].Vol.01 | mtitle=卷 01
+        thumb type=USER_UPLOADED selected=True size=47676
+        thumb type=GENERATED selected=False size=25878
+    book[1] number=02 numberSort=2.0 name=[高橋留美子][亂馬1／2][join].Vol.02 | mtitle=卷 02
+        thumb type=USER_UPLOADED selected=True size=57097
+        thumb type=GENERATED selected=False size=25086
+    book[2] number=03 numberSort=3.0 name=[高橋留美子][亂馬1／2][join].Vol.03 | mtitle=卷 03
+        thumb type=USER_UPLOADED selected=True size=57377
+        thumb type=GENERATED selected=False size=24348
+    book[3] number=04 numberSort=4.0 name=[高橋留美子][亂馬1／2][join].Vol.04 | mtitle=卷 04
+        thumb type=USER_UPLOADED selected=True size=45379
+        thumb type=GENERATED selected=False size=24278
+    book[4] number=05 numberSort=5.0 name=[高橋留美子][亂馬1／2][join].Vol.05 | mtitle=卷 05
+        thumb type=GENERATED selected=False size=25143
+        thumb type=USER_UPLOADED selected=True size=7610
+    book[5] number=06 numberSort=6.0 name=[高橋留美子][亂馬1／2][join].Vol.06 | mtitle=卷 06
+        thumb type=GENERATED selected=False size=23820
+        thumb type=USER_UPLOADED selected=True size=6889
+    book[6] number=07 numberSort=7.0 name=[高橋留美子][亂馬1／2][join].Vol.07 | mtitle=卷 07
+        thumb type=USER_UPLOADED selected=True size=47686
+        thumb type=GENERATED selected=False size=25422
+    book[7] number=08 numberSort=8.0 name=[高橋留美子][亂馬1／2][join].Vol.08 | mtitle=卷 08
+        thumb type=USER_UPLOADED selected=True size=51054
+        thumb type=GENERATED selected=False size=23975
+    book[8] number=09 numberSort=9.0 name=[高橋留美子][亂馬1／2][join].Vol.09 | mtitle=卷 09
+        thumb type=USER_UPLOADED selected=True size=46240
+        thumb type=GENERATED selected=False size=25515
+    book[9] number=10 numberSort=10.0 name=[高橋留美子][亂馬1／2][join].Vol.10 | mtitle=卷 10
+        thumb type=GENERATED selected=False size=24479
+        thumb type=USER_UPLOADED selected=True size=13052
+    book[10] number=11 numberSort=11.0 name=[高橋留美子][亂馬1／2][join].Vol.11 | mtitle=卷 11
+        thumb type=GENERATED selected=False size=24959
+        thumb type=USER_UPLOADED selected=True size=13149
+    book[11] number=12 numberSort=12.0 name=[高橋留美子][亂馬1／2][join].Vol.12 | mtitle=卷 12
+        thumb type=GENERATED selected=False size=25192
+        thumb type=USER_UPLOADED selected=True size=13463
+    book[12] number=13 numberSort=13.0 name=[高橋留美子][亂馬1／2][join].Vol.13 | mtitle=卷 13
+        thumb type=GENERATED selected=False size=24203
+        thumb type=USER_UPLOADED selected=True size=12502
+    book[13] number=14 numberSort=14.0 name=[高橋留美子][亂馬1／2][join].Vol.14 | mtitle=卷 14
+        thumb type=GENERATED selected=False size=23650
+        thumb type=USER_UPLOADED selected=True size=12985
+    book[14] number=15 numberSort=15.0 name=[高橋留美子][亂馬1／2][join].Vol.15 | mtitle=卷 15
+        thumb type=GENERATED selected=False size=22828
+        thumb type=USER_UPLOADED selected=True size=15333
+    book[15] number=16 numberSort=16.0 name=[高橋留美子][亂馬1／2][join].Vol.16 | mtitle=卷 16
+        thumb type=USER_UPLOADED selected=True size=47715
+        thumb type=GENERATED selected=False size=23575
+    book[16] number=17 numberSort=17.0 name=[高橋留美子][亂馬1／2][join].Vol.17 | mtitle=卷 17
+        thumb type=USER_UPLOADED selected=True size=48390
+        thumb type=GENERATED selected=False size=21369
+    book[17] number=18 numberSort=18.0 name=[高橋留美子][亂馬1／2][join].Vol.18 | mtitle=卷 18
+        thumb type=USER_UPLOADED selected=True size=52018
+        thumb type=GENERATED selected=False size=24624
+    book[18] number=19 numberSort=19.0 name=[高橋留美子][亂馬1／2][join].Vol.19 | mtitle=卷 19
+        thumb type=USER_UPLOADED selected=True size=49644
+        thumb type=GENERATED selected=False size=24141
+    book[19] number=20 numberSort=20.0 name=[高橋留美子][亂馬1／2][join].Vol.20 | mtitle=卷 20
+        thumb type=USER_UPLOADED selected=True size=47044
+        thumb type=GENERATED selected=False size=23517
+    book[20] number=21 numberSort=21.0 name=[高橋留美子][亂馬1／2][join].Vol.21 | mtitle=卷 21
+        thumb type=USER_UPLOADED selected=True size=49281
+        thumb type=GENERATED selected=False size=25722
+    book[21] number=22 numberSort=22.0 name=[高橋留美子][亂馬1／2][join].Vol.22 | mtitle=卷 22
+        thumb type=USER_UPLOADED selected=True size=48015
+        thumb type=GENERATED selected=False size=23678
+    book[22] number=23 numberSort=23.0 name=[高橋留美子][亂馬1／2][join].Vol.23 | mtitle=卷 23
+        thumb type=USER_UPLOADED selected=True size=47318
+        thumb type=GENERATED selected=False size=23318
+    book[23] number=24 numberSort=24.0 name=[高橋留美子][亂馬1／2][join].Vol.24 | mtitle=卷 24
+        thumb type=GENERATED selected=False size=24697
+        thumb type=USER_UPLOADED selected=True size=12497
+    book[24] number=25 numberSort=25.0 name=[高橋留美子][亂馬1／2][join].Vol.25 | mtitle=卷 25
+        thumb type=GENERATED selected=False size=22904
+        thumb type=USER_UPLOADED selected=True size=6899
+    book[25] number=26 numberSort=26.0 name=[高橋留美子][亂馬1／2][join].Vol.26 | mtitle=卷 26
+        thumb type=USER_UPLOADED selected=True size=45393
+        thumb type=GENERATED selected=False size=25277
+    book[26] number=27 numberSort=27.0 name=[高橋留美子][亂馬1／2][join].Vol.27 | mtitle=卷 27
+        thumb type=USER_UPLOADED selected=True size=47409
+        thumb type=GENERATED selected=False size=24813
+    book[27] number=28 numberSort=28.0 name=[高橋留美子][亂馬1／2][join].Vol.28 | mtitle=卷 28
+        thumb type=GENERATED selected=False size=22881
+        thumb type=USER_UPLOADED selected=True size=7268
+    book[28] number=29 numberSort=29.0 name=[高橋留美子][亂馬1／2][join].Vol.29 | mtitle=卷 29
+        thumb type=GENERATED selected=False size=25243
+        thumb type=USER_UPLOADED selected=True size=13309
+    book[29] number=30 numberSort=30.0 name=[高橋留美子][亂馬1／2][join].Vol.30 | mtitle=卷 30
+        thumb type=GENERATED selected=False size=23219
+        thumb type=USER_UPLOADED selected=True size=12998
+    book[30] number=31 numberSort=31.0 name=[高橋留美子][亂馬1／2][join].Vol.31 | mtitle=卷 31
+        thumb type=USER_UPLOADED selected=True size=47944
+        thumb type=GENERATED selected=False size=22548
+    book[31] number=32 numberSort=32.0 name=[高橋留美子][亂馬1／2][join].Vol.32 | mtitle=卷 32
+        thumb type=USER_UPLOADED selected=True size=54294
+        thumb type=GENERATED selected=False size=23630
+    book[32] number=33 numberSort=33.0 name=[高橋留美子][亂馬1／2][join].Vol.33 | mtitle=卷 33
+        thumb type=USER_UPLOADED selected=True size=52977
+        thumb type=GENERATED selected=False size=25327
+    book[33] number=34 numberSort=34.0 name=[高橋留美子][亂馬1／2][join].Vol.34 | mtitle=卷 34
+        thumb type=USER_UPLOADED selected=True size=47832
+        thumb type=GENERATED selected=False size=23637
+    book[34] number=35 numberSort=35.0 name=[高橋留美子][亂馬1／2][join].Vol.35 | mtitle=卷 35
+        thumb type=GENERATED selected=False size=22505
+        thumb type=USER_UPLOADED selected=True size=7349
+    book[35] number=36 numberSort=36.0 name=[高橋留美子][亂馬1／2][join].Vol.36 | mtitle=卷 36
+        thumb type=USER_UPLOADED selected=True size=45148
+        thumb type=GENERATED selected=False size=23769
+    book[36] number=37 numberSort=37.0 name=[高橋留美子][亂馬1／2][join].Vol.37 | mtitle=卷 37
+        thumb type=USER_UPLOADED selected=True size=49462
+        thumb type=GENERATED selected=False size=24068
+    book[37] number=38 numberSort=38.0 name=[高橋留美子][亂馬1／2][join].Vol.38 | mtitle=卷 38
+        thumb type=USER_UPLOADED selected=True size=48720
+        thumb type=GENERATED selected=False size=25986
+=== SERIES 0RVS45QZ1ZW8T
+    books=38
+    book[0] number=01 numberSort=1.0 name=Vol.01 | mtitle=卷 01
+        thumb type=USER_UPLOADED selected=True size=47676
+        thumb type=GENERATED selected=False size=12179
+    book[1] number=02 numberSort=2.0 name=Vol.02 | mtitle=卷 02
+        thumb type=USER_UPLOADED selected=True size=57097
+        thumb type=GENERATED selected=False size=12086
+    book[2] number=03 numberSort=3.0 name=Vol.03 | mtitle=卷 03
+        thumb type=USER_UPLOADED selected=True size=57377
+        thumb type=GENERATED selected=False size=13318
+    book[3] number=04 numberSort=4.0 name=Vol.04 | mtitle=卷 04
+        thumb type=USER_UPLOADED selected=True size=45379
+        thumb type=GENERATED selected=False size=14739
+    book[4] number=05 numberSort=5.0 name=Vol.05 | mtitle=卷 05
+        thumb type=GENERATED selected=False size=15375
+        thumb type=USER_UPLOADED selected=True size=7610
+    book[5] number=06 numberSort=6.0 name=Vol.06 | mtitle=卷 06
+        thumb type=GENERATED selected=False size=14735
+        thumb type=USER_UPLOADED selected=True size=6889
+    book[6] number=07 numberSort=7.0 name=Vol.07 | mtitle=卷 07
+        thumb type=USER_UPLOADED selected=True size=47686
+        thumb type=GENERATED selected=False size=12154
+    book[7] number=08 numberSort=8.0 name=Vol.08 | mtitle=卷 08
+        thumb type=USER_UPLOADED selected=True size=51054
+        thumb type=GENERATED selected=False size=13346
+    book[8] number=09 numberSort=9.0 name=Vol.09 | mtitle=卷 09
+        thumb type=USER_UPLOADED selected=True size=46240
+        thumb type=GENERATED selected=False size=14262
+    book[9] number=10 numberSort=10.0 name=Vol.10 | mtitle=卷 10
+        thumb type=GENERATED selected=False size=14435
+        thumb type=USER_UPLOADED selected=True size=13052
+    book[10] number=11 numberSort=11.0 name=Vol.11 | mtitle=卷 11
+        thumb type=GENERATED selected=False size=15198
+        thumb type=USER_UPLOADED selected=True size=13149
+    book[11] number=12 numberSort=12.0 name=Vol.12 | mtitle=卷 12
+        thumb type=GENERATED selected=False size=13863
+        thumb type=USER_UPLOADED selected=True size=13463
+    book[12] number=13 numberSort=13.0 name=Vol.13 | mtitle=卷 13
+        thumb type=GENERATED selected=False size=12597
+        thumb type=USER_UPLOADED selected=True size=12502
+    book[13] number=14 numberSort=14.0 name=Vol.14 | mtitle=卷 14
+        thumb type=GENERATED selected=False size=11303
+        thumb type=USER_UPLOADED selected=True size=12985
+    book[14] number=15 numberSort=15.0 name=Vol.15 | mtitle=卷 15
+        thumb type=GENERATED selected=False size=16403
+        thumb type=USER_UPLOADED selected=True size=15333
+    book[15] number=16 numberSort=16.0 name=Vol.16 | mtitle=卷 16
+        thumb type=USER_UPLOADED selected=True size=47715
+        thumb type=GENERATED selected=False size=14223
+    book[16] number=17 numberSort=17.0 name=Vol.17 | mtitle=卷 17
+        thumb type=USER_UPLOADED selected=True size=48390
+        thumb type=GENERATED selected=False size=12458
+    book[17] number=18 numberSort=18.0 name=Vol.18 | mtitle=卷 18
+        thumb type=USER_UPLOADED selected=False size=54727
+        thumb type=GENERATED selected=False size=13671
+        thumb type=USER_UPLOADED selected=True size=52018
+    book[18] number=19 numberSort=19.0 name=Vol.19 | mtitle=卷 19
+        thumb type=USER_UPLOADED selected=False size=52481
+        thumb type=GENERATED selected=False size=15921
+        thumb type=USER_UPLOADED selected=True size=49644
+    book[19] number=20 numberSort=20.0 name=Vol.20 | mtitle=卷 20
+        thumb type=USER_UPLOADED selected=False size=49395
+        thumb type=GENERATED selected=False size=18613
+        thumb type=USER_UPLOADED selected=True size=47044
+    book[20] number=21 numberSort=21.0 name=Vol.21 | mtitle=卷 21
+        thumb type=USER_UPLOADED selected=False size=51740
+        thumb type=GENERATED selected=False size=9755
+        thumb type=USER_UPLOADED selected=True size=49281
+    book[21] number=22 numberSort=22.0 name=Vol.22 | mtitle=卷 22
+        thumb type=USER_UPLOADED selected=True size=48015
+        thumb type=GENERATED selected=False size=15264
+    book[22] number=23 numberSort=23.0 name=Vol.23 | mtitle=卷 23
+        thumb type=USER_UPLOADED selected=False size=49668
+        thumb type=GENERATED selected=False size=13233
+        thumb type=USER_UPLOADED selected=True size=47318
+    book[23] number=24 numberSort=24.0 name=Vol.24 | mtitle=卷 24
+        thumb type=GENERATED selected=False size=17397
+        thumb type=USER_UPLOADED selected=True size=12497
+    book[24] number=25 numberSort=25.0 name=Vol.25 | mtitle=卷 25
+        thumb type=GENERATED selected=False size=16405
+        thumb type=USER_UPLOADED selected=True size=6899
+    book[25] number=26 numberSort=26.0 name=Vol.26 | mtitle=卷 26
+        thumb type=USER_UPLOADED selected=False size=47707
+        thumb type=GENERATED selected=False size=13259
+        thumb type=USER_UPLOADED selected=True size=45393
+    book[26] number=27 numberSort=27.0 name=Vol.27 | mtitle=卷 27
+        thumb type=USER_UPLOADED selected=False size=49496
+        thumb type=GENERATED selected=False size=15701
+        thumb type=USER_UPLOADED selected=True size=47409
+    book[27] number=28 numberSort=28.0 name=Vol.28 | mtitle=卷 28
+        thumb type=GENERATED selected=False size=13909
+        thumb type=USER_UPLOADED selected=True size=7268
+    book[28] number=29 numberSort=29.0 name=Vol.29 | mtitle=卷 29
+        thumb type=GENERATED selected=False size=13521
+        thumb type=USER_UPLOADED selected=True size=13309
+    book[29] number=30 numberSort=30.0 name=Vol.30 | mtitle=卷 30
+        thumb type=GENERATED selected=False size=12387
+        thumb type=USER_UPLOADED selected=True size=12998
+    book[30] number=31 numberSort=31.0 name=Vol.31 | mtitle=卷 31
+        thumb type=USER_UPLOADED selected=True size=47944
+        thumb type=GENERATED selected=False size=17926
+    book[31] number=32 numberSort=32.0 name=Vol.32 | mtitle=卷 32
+        thumb type=USER_UPLOADED selected=True size=54294
+        thumb type=GENERATED selected=False size=10696
+    book[32] number=33 numberSort=33.0 name=Vol.33 | mtitle=卷 33
+        thumb type=USER_UPLOADED selected=True size=52977
+        thumb type=GENERATED selected=False size=15716
+    book[33] number=34 numberSort=34.0 name=Vol.34 | mtitle=卷 34
+        thumb type=USER_UPLOADED selected=True size=47832
+        thumb type=GENERATED selected=False size=16349
+    book[34] number=35 numberSort=35.0 name=Vol.35 | mtitle=卷 35
+        thumb type=GENERATED selected=False size=14431
+        thumb type=USER_UPLOADED selected=True size=7349
+    book[35] number=36 numberSort=36.0 name=Vol.36 | mtitle=卷 36
+        thumb type=USER_UPLOADED selected=True size=45148
+        thumb type=GENERATED selected=False size=12895
+    book[36] number=37 numberSort=37.0 name=Vol.37 | mtitle=卷 37
+        thumb type=USER_UPLOADED selected=True size=49462
+        thumb type=GENERATED selected=False size=13713
+    book[37] number=38 numberSort=38.0 name=Vol.38 | mtitle=卷 38
+        thumb type=USER_UPLOADED selected=True size=48720
+        thumb type=GENERATED selected=False size=13744
+=== SERIES 0RVS45NP9ZKR5
+    books=38
+    book[0] number=01 numberSort=1.0 name=乱马 Vol.01 | mtitle=卷 01
+        thumb type=USER_UPLOADED selected=True size=47676
+        thumb type=GENERATED selected=False size=12190
+    book[1] number=02 numberSort=2.0 name=乱马 Vol.02 | mtitle=卷 02
+        thumb type=USER_UPLOADED selected=True size=57097
+        thumb type=GENERATED selected=False size=12041
+    book[2] number=03 numberSort=3.0 name=乱马 Vol.03 | mtitle=卷 03
+        thumb type=USER_UPLOADED selected=True size=57377
+        thumb type=GENERATED selected=False size=13236
+    book[3] number=04 numberSort=4.0 name=乱马 Vol.04 | mtitle=卷 04
+        thumb type=USER_UPLOADED selected=True size=45379
+        thumb type=GENERATED selected=False size=14678
+    book[4] number=05 numberSort=5.0 name=乱马 Vol.05 | mtitle=卷 05
+        thumb type=GENERATED selected=False size=15403
+        thumb type=USER_UPLOADED selected=True size=7610
+    book[5] number=06 numberSort=6.0 name=乱马 Vol.06 | mtitle=卷 06
+        thumb type=GENERATED selected=False size=14716
+        thumb type=USER_UPLOADED selected=True size=6889
+    book[6] number=07 numberSort=7.0 name=乱马 Vol.07 | mtitle=卷 07
+        thumb type=USER_UPLOADED selected=True size=47686
+        thumb type=GENERATED selected=False size=12073
+    book[7] number=08 numberSort=8.0 name=乱马 Vol.08 | mtitle=卷 08
+        thumb type=USER_UPLOADED selected=True size=51054
+        thumb type=GENERATED selected=False size=13240
+    book[8] number=09 numberSort=9.0 name=乱马 Vol.09 | mtitle=卷 09
+        thumb type=USER_UPLOADED selected=True size=46240
+        thumb type=GENERATED selected=False size=14261
+    book[9] number=10 numberSort=10.0 name=乱马 Vol.10 | mtitle=卷 10
+        thumb type=GENERATED selected=False size=14327
+        thumb type=USER_UPLOADED selected=True size=13052
+    book[10] number=11 numberSort=11.0 name=乱马 Vol.11 | mtitle=卷 11
+        thumb type=GENERATED selected=False size=15225
+        thumb type=USER_UPLOADED selected=True size=13149
+    book[11] number=12 numberSort=12.0 name=乱马 Vol.12 | mtitle=卷 12
+        thumb type=GENERATED selected=False size=13775
+        thumb type=USER_UPLOADED selected=True size=13463
+    book[12] number=13 numberSort=13.0 name=乱马 Vol.13 | mtitle=卷 13
+        thumb type=GENERATED selected=False size=12536
+        thumb type=USER_UPLOADED selected=True size=12502
+    book[13] number=14 numberSort=14.0 name=乱马 Vol.14 | mtitle=卷 14
+        thumb type=GENERATED selected=False size=11211
+        thumb type=USER_UPLOADED selected=True size=12985
+    book[14] number=15 numberSort=15.0 name=乱马 Vol.15 | mtitle=卷 15
+        thumb type=GENERATED selected=False size=16427
+        thumb type=USER_UPLOADED selected=True size=15333
+    book[15] number=16 numberSort=16.0 name=乱马 Vol.16 | mtitle=卷 16
+        thumb type=USER_UPLOADED selected=True size=47715
+        thumb type=GENERATED selected=False size=14153
+    book[16] number=17 numberSort=17.0 name=乱马 Vol.17 | mtitle=卷 17
+        thumb type=USER_UPLOADED selected=True size=48390
+        thumb type=GENERATED selected=False size=12421
+    book[17] number=18 numberSort=18.0 name=乱马 Vol.18 | mtitle=卷 18
+        thumb type=USER_UPLOADED selected=True size=52018
+        thumb type=GENERATED selected=False size=13668
+    book[18] number=19 numberSort=19.0 name=乱马 Vol.19 | mtitle=卷 19
+        thumb type=USER_UPLOADED selected=True size=49644
+        thumb type=GENERATED selected=False size=15979
+    book[19] number=20 numberSort=20.0 name=乱马 Vol.20 | mtitle=卷 20
+        thumb type=USER_UPLOADED selected=True size=47044
+        thumb type=GENERATED selected=False size=18628
+    book[20] number=21 numberSort=21.0 name=乱马 Vol.21 | mtitle=卷 21
+        thumb type=USER_UPLOADED selected=True size=49281
+        thumb type=GENERATED selected=False size=9740
+    book[21] number=22 numberSort=22.0 name=乱马 Vol.22 | mtitle=卷 22
+        thumb type=USER_UPLOADED selected=True size=48015
+        thumb type=GENERATED selected=False size=15220
+    book[22] number=23 numberSort=23.0 name=乱马 Vol.23 | mtitle=卷 23
+        thumb type=USER_UPLOADED selected=True size=47318
+        thumb type=GENERATED selected=False size=13219
+    book[23] number=24 numberSort=24.0 name=乱马 Vol.24 | mtitle=卷 24
+        thumb type=GENERATED selected=False size=17285
+        thumb type=USER_UPLOADED selected=True size=12497
+    book[24] number=25 numberSort=25.0 name=乱马 Vol.25 | mtitle=卷 25
+        thumb type=GENERATED selected=False size=16390
+        thumb type=USER_UPLOADED selected=True size=6899
+    book[25] number=26 numberSort=26.0 name=乱马 Vol.26 | mtitle=卷 26
+        thumb type=USER_UPLOADED selected=True size=45393
+        thumb type=GENERATED selected=False size=13279
+    book[26] number=27 numberSort=27.0 name=乱马 Vol.27 | mtitle=卷 27
+        thumb type=USER_UPLOADED selected=True size=47409
+        thumb type=GENERATED selected=False size=15658
+    book[27] number=28 numberSort=28.0 name=乱马 Vol.28 | mtitle=卷 28
+        thumb type=GENERATED selected=False size=13799
+        thumb type=USER_UPLOADED selected=True size=7268
+    book[28] number=29 numberSort=29.0 name=乱马 Vol.29 | mtitle=卷 29
+        thumb type=GENERATED selected=False size=13481
+        thumb type=USER_UPLOADED selected=True size=13309
+    book[29] number=30 numberSort=30.0 name=乱马 Vol.30 | mtitle=卷 30
+        thumb type=GENERATED selected=False size=12319
+        thumb type=USER_UPLOADED selected=True size=12998
+    book[30] number=31 numberSort=31.0 name=乱马 Vol.31 | mtitle=卷 31
+        thumb type=USER_UPLOADED selected=True size=47944
+        thumb type=GENERATED selected=False size=17877
+    book[31] number=32 numberSort=32.0 name=乱马 Vol.32 | mtitle=卷 32
+        thumb type=USER_UPLOADED selected=True size=54294
+        thumb type=GENERATED selected=False size=10614
+    book[32] number=33 numberSort=33.0 name=乱马 Vol.33 | mtitle=卷 33
+        thumb type=USER_UPLOADED selected=True size=52977
+        thumb type=GENERATED selected=False size=15704
+    book[33] number=34 numberSort=34.0 name=乱马 Vol.34 | mtitle=卷 34
+        thumb type=USER_UPLOADED selected=True size=47832
+        thumb type=GENERATED selected=False size=16269
+    book[34] number=35 numberSort=35.0 name=乱马 Vol.35 | mtitle=卷 35
+        thumb type=GENERATED selected=False size=14371
+        thumb type=USER_UPLOADED selected=True size=7349
+    book[35] number=36 numberSort=36.0 name=乱马 Vol.36 | mtitle=卷 36
+        thumb type=USER_UPLOADED selected=True size=45148
+        thumb type=GENERATED selected=False size=12881
+    book[36] number=37 numberSort=37.0 name=乱马 Vol.37 | mtitle=卷 37
+        thumb type=USER_UPLOADED selected=True size=49462
+        thumb type=GENERATED selected=False size=13675
+    book[37] number=38 numberSort=38.0 name=乱马 Vol.38 | mtitle=卷 38
+        thumb type=USER_UPLOADED selected=True size=48720
+        thumb type=GENERATED selected=False size=13681
+=== SERIES 0RVS45WEXZSSC
+    books=38
+    book[0] number=01 numberSort=1.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_01 | mtitle=卷 01
+        thumb type=GENERATED selected=False size=15384
+        thumb type=USER_UPLOADED selected=True size=47676
+    book[1] number=02 numberSort=2.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_02 | mtitle=卷 02
+        thumb type=GENERATED selected=False size=15585
+        thumb type=USER_UPLOADED selected=True size=57097
+    book[2] number=03 numberSort=3.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_03 | mtitle=卷 03
+        thumb type=GENERATED selected=False size=14372
+        thumb type=USER_UPLOADED selected=True size=57377
+    book[3] number=04 numberSort=4.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_04 | mtitle=卷 04
+        thumb type=GENERATED selected=False size=14917
+        thumb type=USER_UPLOADED selected=True size=45379
+    book[4] number=05 numberSort=5.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_05 | mtitle=卷 05
+        thumb type=GENERATED selected=False size=14889
+        thumb type=USER_UPLOADED selected=True size=7610
+    book[5] number=06 numberSort=6.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_06 | mtitle=卷 06
+        thumb type=GENERATED selected=False size=14957
+        thumb type=USER_UPLOADED selected=True size=6889
+    book[6] number=07 numberSort=7.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_07 | mtitle=卷 07
+        thumb type=GENERATED selected=False size=14557
+        thumb type=USER_UPLOADED selected=True size=47686
+    book[7] number=08 numberSort=8.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_08 | mtitle=卷 08
+        thumb type=GENERATED selected=False size=15508
+        thumb type=USER_UPLOADED selected=True size=51054
+    book[8] number=09 numberSort=9.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_09 | mtitle=卷 09
+        thumb type=GENERATED selected=False size=17039
+        thumb type=USER_UPLOADED selected=True size=46240
+    book[9] number=10 numberSort=10.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_10 | mtitle=卷 10
+        thumb type=GENERATED selected=False size=17164
+        thumb type=USER_UPLOADED selected=True size=13052
+    book[10] number=11 numberSort=11.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_11 | mtitle=卷 11
+        thumb type=GENERATED selected=False size=15115
+        thumb type=USER_UPLOADED selected=True size=13149
+    book[11] number=12 numberSort=12.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_12 | mtitle=卷 12
+        thumb type=GENERATED selected=False size=17068
+        thumb type=USER_UPLOADED selected=True size=13463
+    book[12] number=13 numberSort=13.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_13 | mtitle=卷 13
+        thumb type=GENERATED selected=False size=17494
+        thumb type=USER_UPLOADED selected=True size=12502
+    book[13] number=14 numberSort=14.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_14 | mtitle=卷 14
+        thumb type=GENERATED selected=False size=15357
+        thumb type=USER_UPLOADED selected=True size=12985
+    book[14] number=15 numberSort=15.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_15 | mtitle=卷 15
+        thumb type=GENERATED selected=False size=16710
+        thumb type=USER_UPLOADED selected=True size=15333
+    book[15] number=16 numberSort=16.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_16 | mtitle=卷 16
+        thumb type=GENERATED selected=False size=16475
+        thumb type=USER_UPLOADED selected=True size=47715
+    book[16] number=17 numberSort=17.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_17 | mtitle=卷 17
+        thumb type=GENERATED selected=False size=14164
+        thumb type=USER_UPLOADED selected=True size=48390
+    book[17] number=18 numberSort=18.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_18 | mtitle=卷 18
+        thumb type=GENERATED selected=False size=17253
+        thumb type=USER_UPLOADED selected=True size=52018
+    book[18] number=19 numberSort=19.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_19 | mtitle=卷 19
+        thumb type=GENERATED selected=False size=17229
+        thumb type=USER_UPLOADED selected=True size=49644
+    book[19] number=20 numberSort=20.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_20 | mtitle=卷 20
+        thumb type=GENERATED selected=False size=16732
+        thumb type=USER_UPLOADED selected=True size=47044
+    book[20] number=21 numberSort=21.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_21 | mtitle=卷 21
+        thumb type=GENERATED selected=False size=15640
+        thumb type=USER_UPLOADED selected=True size=49281
+    book[21] number=22 numberSort=22.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_22 | mtitle=卷 22
+        thumb type=GENERATED selected=False size=15748
+        thumb type=USER_UPLOADED selected=True size=48015
+    book[22] number=23 numberSort=23.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_23 | mtitle=卷 23
+        thumb type=GENERATED selected=False size=16631
+        thumb type=USER_UPLOADED selected=True size=47318
+    book[23] number=24 numberSort=24.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_24 | mtitle=卷 24
+        thumb type=GENERATED selected=False size=19378
+        thumb type=USER_UPLOADED selected=True size=12497
+    book[24] number=25 numberSort=25.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_25 | mtitle=卷 25
+        thumb type=GENERATED selected=False size=17713
+        thumb type=USER_UPLOADED selected=True size=6899
+    book[25] number=26 numberSort=26.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_26 | mtitle=卷 26
+        thumb type=GENERATED selected=False size=15651
+        thumb type=USER_UPLOADED selected=True size=45393
+    book[26] number=27 numberSort=27.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_27 | mtitle=卷 27
+        thumb type=GENERATED selected=False size=17880
+        thumb type=USER_UPLOADED selected=True size=47409
+    book[27] number=28 numberSort=28.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_28 | mtitle=卷 28
+        thumb type=GENERATED selected=False size=16251
+        thumb type=USER_UPLOADED selected=True size=7268
+    book[28] number=29 numberSort=29.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_29 | mtitle=卷 29
+        thumb type=GENERATED selected=False size=17553
+        thumb type=USER_UPLOADED selected=True size=13309
+    book[29] number=30 numberSort=30.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_30 | mtitle=卷 30
+        thumb type=GENERATED selected=False size=17208
+        thumb type=USER_UPLOADED selected=True size=12998
+    book[30] number=31 numberSort=31.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_31 | mtitle=卷 31
+        thumb type=GENERATED selected=False size=17044
+        thumb type=USER_UPLOADED selected=True size=47944
+    book[31] number=32 numberSort=32.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_32 | mtitle=卷 32
+        thumb type=GENERATED selected=False size=16267
+        thumb type=USER_UPLOADED selected=True size=54294
+    book[32] number=33 numberSort=33.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_33 | mtitle=卷 33
+        thumb type=GENERATED selected=False size=16867
+        thumb type=USER_UPLOADED selected=True size=52977
+    book[33] number=34 numberSort=34.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_34 | mtitle=卷 34
+        thumb type=GENERATED selected=False size=16799
+        thumb type=USER_UPLOADED selected=True size=47832
+    book[34] number=35 numberSort=35.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_35 | mtitle=卷 35
+        thumb type=GENERATED selected=False size=16288
+        thumb type=USER_UPLOADED selected=True size=7349
+    book[35] number=36 numberSort=36.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_36 | mtitle=卷 36
+        thumb type=GENERATED selected=False size=16405
+        thumb type=USER_UPLOADED selected=True size=45148
+    book[36] number=37 numberSort=37.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_37 | mtitle=卷 37
+        thumb type=GENERATED selected=False size=16601
+        thumb type=USER_UPLOADED selected=True size=49462
+    book[37] number=38 numberSort=38.0 name=[Comic][亂馬１／２][高橋留美子][文傳][C.C]Vol_38 | mtitle=卷 38
+        thumb type=GENERATED selected=False size=9051
+        thumb type=USER_UPLOADED selected=True size=48720
+

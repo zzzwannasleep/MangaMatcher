@@ -1,0 +1,53 @@
+﻿RELATED=50
+rel[0] relation=画集 id=594537 name_cn= name=らんま1/2公式ファンブック 大歓喜 img=https://lain.bgm.tv/pic/cover/l/8e/3a/594537_dxAzM.jpg
+rel[1] relation=不同版本 id=563179 name_cn=乱马1/2 name=らんま1/2 img=https://lain.bgm.tv/pic/cover/l/2b/3e/563179_vNRwe.jpg
+rel[2] relation=游戏 id=523148 name_cn=乱马1/2 白兰爱歌 name=らんま1/2 白蘭愛歌 img=https://lain.bgm.tv/pic/cover/l/72/7b/523148_5JkCJ.jpg
+rel[3] relation=游戏 id=520356 name_cn=乱马1/2 爆烈乱斗篇 name=らんま1/2 爆烈乱闘篇 img=https://lain.bgm.tv/pic/cover/l/6e/58/520356_qhNZO.jpg
+rel[4] relation=游戏 id=520350 name_cn=乱马1/2 町内激斗篇 name=らんま1/2 町内激闘篇 img=https://lain.bgm.tv/pic/cover/l/00/66/520350_6l6lP.jpg
+rel[5] relation=游戏 id=516878 name_cn=乱马1/2 飞龙传说 name=らんま1/2 飛龍伝説 img=https://lain.bgm.tv/pic/cover/l/fc/f7/516878_hs344.jpg
+rel[6] relation=三次元 id=28291 name_cn=乱马1/2 name=らんま1/2 img=https://lain.bgm.tv/pic/cover/l/18/e3/28291_4QCX1.jpg
+rel[7] relation=单行本 id=5238 name_cn= name=らんま1/2 (01) img=https://lain.bgm.tv/pic/cover/l/c5/ab/5238_jp.jpg
+rel[8] relation=动画 id=2789 name_cn=乱马1/2 name=らんま1/2 img=https://lain.bgm.tv/pic/cover/l/b1/9a/2789_4OsUj.jpg
+rel[9] relation=动画 id=65883 name_cn=乱马1/2 热斗篇 name=らんま1/2 熱闘編 img=https://lain.bgm.tv/pic/cover/l/d7/f0/65883_T0ilB.jpg
+rel[10] relation=单行本 id=5255 name_cn= name=らんま1/2 (02) img=https://lain.bgm.tv/pic/cover/l/95/e6/5255_jp.jpg
+rel[11] relation=动画 id=489820 name_cn=乱马1/2 name=らんま1/2 img=https://lain.bgm.tv/pic/cover/l/13/a3/489820_Hre3R.jpg
+rel[12] relation=单行本 id=5260 name_cn= name=らんま1/2 (03) img=https://lain.bgm.tv/pic/cover/l/60/18/5260_jp.jpg
+rel[13] relation=动画 id=529966 name_cn=乱马1/2 第二季 name=らんま1/2 第2期 img=https://lain.bgm.tv/pic/cover/l/a3/5e/529966_uzkZd.jpg
+rel[14] relation=单行本 id=5245 name_cn= name=らんま1/2 (04) img=https://lain.bgm.tv/pic/cover/l/43/5d/5245_jp.jpg
+rel[15] relation=动画 id=637802 name_cn=乱马1/2 第三季 name=らんま1/2 第3期 img=https://lain.bgm.tv/pic/cover/l/7a/49/637802_YVTam.jpg
+rel[16] relation=单行本 id=5252 name_cn= name=らんま1/2 (05) img=https://lain.bgm.tv/pic/cover/l/55/53/5252_MGooU.jpg
+rel[17] relation=单行本 id=5253 name_cn= name=らんま1/2 (06) img=https://lain.bgm.tv/pic/cover/l/d8/11/5253_pvoUW.jpg
+rel[18] relation=单行本 id=5254 name_cn= name=らんま1/2 (07) img=https://lain.bgm.tv/pic/cover/l/5d/0d/5254_jp.jpg
+rel[19] relation=单行本 id=5261 name_cn= name=らんま1/2 (08) img=https://lain.bgm.tv/pic/cover/l/c6/94/5261_jp.jpg
+rel[20] relation=单行本 id=5258 name_cn= name=らんま1/2 (09) img=https://lain.bgm.tv/pic/cover/l/36/fa/5258_jp.jpg
+rel[21] relation=单行本 id=5243 name_cn= name=らんま1/2 (10) img=https://lain.bgm.tv/pic/cover/l/b4/9d/5243_jp.jpg
+rel[22] relation=单行本 id=5250 name_cn= name=らんま1/2 (11) img=https://lain.bgm.tv/pic/cover/l/48/65/5250_FFW5S.jpg
+rel[23] relation=单行本 id=5251 name_cn= name=らんま1/2 (12) img=https://lain.bgm.tv/pic/cover/l/6f/e4/5251_gSwo6.jpg
+rel[24] relation=单行本 id=5259 name_cn= name=らんま1/2 (13) img=https://lain.bgm.tv/pic/cover/l/f9/68/5259_jp.jpg
+rel[25] relation=单行本 id=5264 name_cn= name=らんま1/2 (14) img=https://lain.bgm.tv/pic/cover/l/63/32/5264_jp.jpg
+rel[26] relation=单行本 id=5256 name_cn= name=らんま1/2 (15) img=https://lain.bgm.tv/pic/cover/l/88/19/5256_jp.jpg
+rel[27] relation=单行本 id=5265 name_cn= name=らんま1/2 (16) img=https://lain.bgm.tv/pic/cover/l/f1/27/5265_jp.jpg
+rel[28] relation=单行本 id=5257 name_cn= name=らんま1/2 (17) img=https://lain.bgm.tv/pic/cover/l/3d/de/5257_jp.jpg
+rel[29] relation=单行本 id=5248 name_cn= name=らんま1/2 (18) img=https://lain.bgm.tv/pic/cover/l/81/bc/5248_83Qgi.jpg
+rel[30] relation=单行本 id=5262 name_cn= name=らんま1/2 (19) img=https://lain.bgm.tv/pic/cover/l/04/da/5262_XzpSs.jpg
+rel[31] relation=单行本 id=5266 name_cn= name=らんま1/2 (20) img=https://lain.bgm.tv/pic/cover/l/59/b8/5266_jp.jpg
+rel[32] relation=单行本 id=5267 name_cn= name=らんま1/2 (21) img=https://lain.bgm.tv/pic/cover/l/4c/ef/5267_eK9i7.jpg
+rel[33] relation=单行本 id=5268 name_cn= name=らんま1/2 (22) img=https://lain.bgm.tv/pic/cover/l/02/a3/5268_91YEt.jpg
+rel[34] relation=单行本 id=5244 name_cn= name=らんま1/2 (23) img=https://lain.bgm.tv/pic/cover/l/0d/a4/5244_jp.jpg
+rel[35] relation=单行本 id=5263 name_cn= name=らんま1/2 (24) img=https://lain.bgm.tv/pic/cover/l/cc/63/5263_jp.jpg
+rel[36] relation=单行本 id=5249 name_cn= name=らんま1/2 (25) img=https://lain.bgm.tv/pic/cover/l/6d/ff/5249_e2N6W.jpg
+rel[37] relation=单行本 id=5273 name_cn= name=らんま1/2 (26) img=https://lain.bgm.tv/pic/cover/l/20/5e/5273_jp.jpg
+rel[38] relation=单行本 id=5240 name_cn= name=らんま1/2 (27) img=https://lain.bgm.tv/pic/cover/l/29/da/5240_jp.jpg
+rel[39] relation=单行本 id=5247 name_cn= name=らんま1/2 (28) img=https://lain.bgm.tv/pic/cover/l/c9/00/5247_jp.jpg
+rel[40] relation=单行本 id=5272 name_cn= name=らんま1/2 (29) img=https://lain.bgm.tv/pic/cover/l/e8/85/5272_jp.jpg
+rel[41] relation=单行本 id=5269 name_cn= name=らんま1/2 (30) img=https://lain.bgm.tv/pic/cover/l/1d/c3/5269_jp.jpg
+rel[42] relation=单行本 id=5271 name_cn= name=らんま1/2 (31) img=https://lain.bgm.tv/pic/cover/l/08/aa/5271_jp.jpg
+rel[43] relation=单行本 id=5284 name_cn= name=らんま1/2 (32) img=https://lain.bgm.tv/pic/cover/l/0b/9e/5284_jp.jpg
+rel[44] relation=单行本 id=5270 name_cn= name=らんま1/2 (33) img=https://lain.bgm.tv/pic/cover/l/c4/bb/5270_jp.jpg
+rel[45] relation=单行本 id=5246 name_cn= name=らんま1/2 (34) img=https://lain.bgm.tv/pic/cover/l/ed/c2/5246_jp.jpg
+rel[46] relation=单行本 id=5242 name_cn= name=らんま1/2 (35) img=https://lain.bgm.tv/pic/cover/l/00/9a/5242_jp.jpg
+rel[47] relation=单行本 id=5241 name_cn= name=らんま1/2 (36) img=https://lain.bgm.tv/pic/cover/l/d1/4f/5241_jp.jpg
+rel[48] relation=单行本 id=5283 name_cn= name=らんま1/2 (37) img=https://lain.bgm.tv/pic/cover/l/5c/a3/5283_jp.jpg
+rel[49] relation=单行本 id=5296 name_cn= name=らんま1/2 (38) img=https://lain.bgm.tv/pic/cover/l/fd/9d/5296_jp.jpg
+MAIN name_cn=乱马1/2 name=らんま1/2 img=https://lain.bgm.tv/pic/cover/l/23/fa/5239_hHKv4.jpg
+
