@@ -50,7 +50,7 @@
 dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
 ```
 
-推送到 `main` 自动触发云端构建，每次构建产出一个小版本（`0.0.1`、`0.0.2` …步进），自动发布到 [Releases](https://github.com/zzzwannasleep/MangaMatcher/releases)。
+推送到 `main` 自动触发云端构建：Windows 单文件版发布到 [Releases](https://github.com/zzzwannasleep/MangaMatcher/releases)（每次构建一个小版本，`0.0.1`、`0.0.2` …步进）；macOS 上同时验证跨平台代码并产出 CLI（osx-arm64 / osx-x64）构建产物（GUI 版为 WinForms，仅支持 Windows）。
 
 ## 📄 许可
 
