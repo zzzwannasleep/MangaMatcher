@@ -169,20 +169,91 @@ public sealed partial class MainWindow : Window
             miCopyId.IsEnabled = s != null && GetBtvSubjectId(s).HasValue;
         };
         SeriesGrid.ContextMenu = seriesMenu;
-        // 右键命中行：PointerPressed 捕获行并记忆，菜单弹出时已在 Opening 里取
+        // 指针处理：右键命中行 + 左键拖拽框选（橡皮筋，跨平台一致）
         SeriesGrid.AddHandler(PointerPressedEvent, OnSeriesPointerPressed, RoutingStrategies.Tunnel);
+        SeriesGrid.AddHandler(PointerMovedEvent, OnSeriesPointerMoved, RoutingStrategies.Tunnel);
+        SeriesGrid.AddHandler(PointerReleasedEvent, OnSeriesPointerReleased, RoutingStrategies.Tunnel);
     }
 
-    /// <summary>右键所在行对应的系列（沿可视树找 DataGridRow，命中即选中并记忆）。</summary>
+    // ================= 拖拽框选（按住左键拖出方框，碰到的行全部勾选；6px 阈值内仍是普通点击） =================
+
+    private bool _bandMaybe;      // 左键已按下、还没超阈值
+    private bool _bandActive;     // 框选进行中
+    private Point _bandStart;
+
     private void OnSeriesPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(SeriesGrid).Properties.IsRightButtonPressed) return;
-        var el = e.Source as Visual;
-        while (el is not null && el is not DataGridRow) el = el.Parent as Visual;
-        if (el is DataGridRow row && row.DataContext is SeriesRow sr)
+        var pt = e.GetCurrentPoint(SeriesGrid);
+        if (pt.Properties.IsRightButtonPressed)
         {
-            _contextSeries = sr.Series;
-            SeriesGrid.SelectedItem = sr;
+            // 右键命中行：沿可视树找 DataGridRow，命中即选中并记忆（供右键菜单用）
+            var el = e.Source as Visual;
+            while (el is not null && el is not DataGridRow) el = el.Parent as Visual;
+            if (el is DataGridRow row && row.DataContext is SeriesRow sr)
+            {
+                _contextSeries = sr.Series;
+                SeriesGrid.SelectedItem = sr;
+            }
+            return;
+        }
+        if (!pt.Properties.IsLeftButtonPressed) return;
+        _bandMaybe = true;
+        _bandStart = pt.Position;
+        e.Pointer.Capture(SeriesGrid);   // 统一捕获：拖出列表边界也能继续收 moved/released
+    }
+
+    private void OnSeriesPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_bandMaybe) return;
+        var pt = e.GetCurrentPoint(SeriesGrid);
+        if (!pt.Properties.IsLeftButtonPressed) return;
+        var pos = pt.Position;
+        if (!_bandActive &&
+            Math.Abs(pos.X - _bandStart.X) + Math.Abs(pos.Y - _bandStart.Y) < 6) return;   // 普通点击不动它
+
+        if (!_bandActive) _bandActive = true;
+        DrawBandRect(_bandStart, pos);
+        SelectSeriesByBand(_bandStart, pos);
+    }
+
+    private void OnSeriesPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_bandMaybe) return;
+        _bandMaybe = false;
+        if (!_bandActive) return;   // 没拖出框 = 普通点击，交回原行为
+        _bandActive = false;
+        BandRect.IsVisible = false;
+    }
+
+    /// <summary>把方框画到覆盖层 Canvas 上（列表坐标系）。</summary>
+    private void DrawBandRect(Point a, Point b)
+    {
+        var x = Math.Min(a.X, b.X);
+        var y = Math.Min(a.Y, b.Y);
+        var w = Math.Abs(a.X - b.X);
+        var h = Math.Abs(a.Y - b.Y);
+        Canvas.SetLeft(BandRect, x);
+        Canvas.SetTop(BandRect, y);
+        BandRect.Width = w;
+        BandRect.Height = h;
+        BandRect.IsVisible = true;
+    }
+
+    /// <summary>方框碰到的行：勾选 + 选中（可见行遍历；虚拟化下未滚出的行不在树里，滚动后再框即可）。</summary>
+    private void SelectSeriesByBand(Point a, Point b)
+    {
+        var rect = new Rect(
+            Math.Min(a.X, b.X), Math.Min(a.Y, b.Y),
+            Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
+        foreach (var row in SeriesGrid.GetVisualDescendants().OfType<DataGridRow>())
+        {
+            if (row.DataContext is not SeriesRow sr) continue;
+            var topLeft = row.TranslatePoint(new Point(0, 0), SeriesGrid);
+            if (topLeft is not { } tl) continue;
+            var rowRect = new Rect(tl, row.Bounds.Size);
+            if (!rowRect.Intersects(rect)) continue;
+            if (!sr.Checked) sr.Checked = true;
+            if (!SeriesGrid.SelectedItems.Contains(sr)) SeriesGrid.SelectedItems.Add(sr);
         }
     }
 

@@ -104,31 +104,38 @@
 
                 <!-- ================= 右侧内容区：列表（上）+ 日志（下），中间可拖动 ================= -->
                 <Grid Grid.Column="1" Margin="4,8,8,4" RowDefinitions="62*,5,38*">
-                    <DataGrid x:Name="SeriesGrid" Grid.Row="0"
-                              AutoGenerateColumns="False" CanUserResizeColumns="True"
-                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#ECECF2"
-                              HeadersVisibility="Column" SelectionMode="Extended"
-                              Background="White" RowBackground="Transparent"
-                              BorderThickness="1" BorderBrush="{StaticResource CardBorderBrush}" CornerRadius="8"
-                              DoubleTapped="OnSeriesDoubleTapped" Sorting="OnSeriesSorting">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="38" CanUserSort="False" CanUserResize="False">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <CheckBox IsChecked="{Binding Checked, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="31*" IsReadOnly="True" />
-                            <DataGridTextColumn Header="文件夹名" Binding="{Binding Folder}" Width="19*" IsReadOnly="True" />
-                            <DataGridTextColumn Header="册数" Binding="{Binding Count}" Width="6*" IsReadOnly="True" />
-                            <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="7*" IsReadOnly="True" />
-                            <DataGridTextColumn Header="链接" Binding="{Binding Link}" Width="6*" IsReadOnly="True" />
-                            <DataGridTextColumn Header="封面" Binding="{Binding Cover}" Width="5*" IsReadOnly="True" />
-                            <DataGridTextColumn Header="简介" Binding="{Binding Summary}" Width="5*" IsReadOnly="True" />
-                            <DataGridTextColumn Header="BGM ID" Binding="{Binding BgmId}" Width="21*" IsReadOnly="True" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Panel Grid.Row="0">
+                        <DataGrid x:Name="SeriesGrid"
+                                  AutoGenerateColumns="False" CanUserResizeColumns="True"
+                                  GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#ECECF2"
+                                  HeadersVisibility="Column" SelectionMode="Extended"
+                                  Background="White" RowBackground="Transparent"
+                                  BorderThickness="1" BorderBrush="{StaticResource CardBorderBrush}" CornerRadius="8"
+                                  DoubleTapped="OnSeriesDoubleTapped" Sorting="OnSeriesSorting">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="38" CanUserSort="False" CanUserResize="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding Checked, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="31*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="文件夹名" Binding="{Binding Folder}" Width="19*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="册数" Binding="{Binding Count}" Width="6*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="7*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="链接" Binding="{Binding Link}" Width="6*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="封面" Binding="{Binding Cover}" Width="5*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="简介" Binding="{Binding Summary}" Width="5*" IsReadOnly="True" />
+                                <DataGridTextColumn Header="BGM ID" Binding="{Binding BgmId}" Width="21*" IsReadOnly="True" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <!-- 拖拽框选覆盖层（橡皮筋；跨平台：Win/Mac 左键拖拽行为一致） -->
+                        <Canvas x:Name="BandCanvas" IsHitTestVisible="False">
+                            <Rectangle x:Name="BandRect" Fill="#265B5BD6" Stroke="#5B5BD6" StrokeThickness="1"
+                                       StrokeDashArray="3,3" IsVisible="False" />
+                        </Canvas>
+                    </Panel>
 
                     <GridSplitter Grid.Row="1" Height="5" Background="#D0D0DA" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" />
 

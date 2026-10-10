@@ -17,10 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  release:
+  # ================= Windows 构建（并行） =================
+  windows:
     runs-on: windows-latest
     timeout-minutes: 30
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,30 +30,118 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Compute version
-        id: ver
-        shell: bash
-        run: echo "version=0.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-
       - name: Publish
         run: >
           dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj
           -c Release -r win-x64 --self-contained false
           -p:PublishSingleFile=true
-          -p:Version=${{ steps.ver.outputs.version }}
-          -p:InformationalVersion=${{ steps.ver.outputs.version }}
+          -p:Version=0.0.${{ github.run_number }}
+          -p:InformationalVersion=0.0.${{ github.run_number }}
 
       - name: Package
         shell: pwsh
         run: >
           Compress-Archive
           -Path "src/KomgaScraper.App/bin/Release/net8.0-windows/win-x64/publish/*"
-          -DestinationPath "KomgaScraper-${{ steps.ver.outputs.version }}-win-x64.zip"
+          -DestinationPath "KomgaScraper-0.0.${{ github.run_number }}-win-x64.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-${{ github.run_number }}
+          path: KomgaScraper-*.zip
+          if-no-files-found: error
+
+  # ================= macOS 构建（并行） =================
+  macos:
+    runs-on: macos-14 # Apple Silicon (arm64)
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build cross-platform projects
+        run: |
+          dotnet build src/KomgaScraper.Core/KomgaScraper.Core.csproj -c Release
+          dotnet build tools/TestCli/TestCli.csproj -c Release
+          for t in tests/*/; do
+            proj=$(find "$t" -maxdepth 1 -name '*.csproj')
+            [ -n "$proj" ] && dotnet build "$proj" -c Release
+          done
+
+      - name: Publish GUI (osx-arm64)
+        run: >
+          dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj
+          -c Release -r osx-arm64 --self-contained false
+          -p:PublishSingleFile=true
+          -p:EnableWindowsTargeting=true
+          -p:Version=0.0.${{ github.run_number }}
+          -p:InformationalVersion=0.0.${{ github.run_number }}
+
+      - name: Publish GUI (osx-x64)
+        run: >
+          dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj
+          -c Release -r osx-x64 --self-contained false
+          -p:PublishSingleFile=true
+          -p:EnableWindowsTargeting=true
+          -p:Version=0.0.${{ github.run_number }}
+          -p:InformationalVersion=0.0.${{ github.run_number }}
+
+      - name: Publish CLI (osx-arm64)
+        run: >
+          dotnet publish tools/TestCli/TestCli.csproj
+          -c Release -r osx-arm64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:Version=0.0.${{ github.run_number }}
+
+      - name: Publish CLI (osx-x64)
+        run: >
+          dotnet publish tools/TestCli/TestCli.csproj
+          -c Release -r osx-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:Version=0.0.${{ github.run_number }}
+
+      - name: Package
+        run: |
+          cd src/KomgaScraper.App/bin/Release/net8.0-windows/osx-arm64/publish
+          zip -qr "$GITHUB_WORKSPACE/KomgaScraper-0.0.${{ github.run_number }}-macos-arm64.zip" .
+          cd "$GITHUB_WORKSPACE/src/KomgaScraper.App/bin/Release/net8.0-windows/osx-x64/publish"
+          zip -qr "$GITHUB_WORKSPACE/KomgaScraper-0.0.${{ github.run_number }}-macos-x64.zip" .
+          cd "$GITHUB_WORKSPACE/tools/TestCli/bin/Release/net8.0/osx-arm64/publish"
+          zip -qr "$GITHUB_WORKSPACE/KomgaScraper-CLI-0.0.${{ github.run_number }}-osx-arm64.zip" .
+          cd "$GITHUB_WORKSPACE/tools/TestCli/bin/Release/net8.0/osx-x64/publish"
+          zip -qr "$GITHUB_WORKSPACE/KomgaScraper-CLI-0.0.${{ github.run_number }}-osx-x64.zip" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ github.run_number }}
+          path: |
+            KomgaScraper-*-macos-*.zip
+            KomgaScraper-CLI-*.zip
+          if-no-files-found: error
+
+  # ================= 发布（串行收口：单一版本号，全部资产入同一个 Release） =================
+  release:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          name: v${{ steps.ver.outputs.version }}
-          files: KomgaScraper-${{ steps.ver.outputs.version }}-win-x64.zip
+          tag_name: v0.0.${{ github.run_number }}
+          name: v0.0.${{ github.run_number }}
+          files: artifacts/*.zip
           generate_release_notes: true
