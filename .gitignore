@@ -16,3 +16,6 @@ out/
 
 # Logs
 *.log
+
+# Debug traces
+trace-*.txt
