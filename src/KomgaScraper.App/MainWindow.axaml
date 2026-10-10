@@ -120,15 +120,16 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <!-- 全部按比例星号宽 + MinWidth 保底：随窗口缩放，短值列不再固定 74 截断 -->
-                                <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="30*" IsReadOnly="True" MinWidth="140" />
-                                <DataGridTextColumn Header="文件夹名" Binding="{Binding Folder}" Width="16*" IsReadOnly="True" MinWidth="104" />
-                                <DataGridTextColumn Header="册数" Binding="{Binding Count}" Width="6*" IsReadOnly="True" MinWidth="66" />
-                                <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="7*" IsReadOnly="True" MinWidth="84" />
-                                <DataGridTextColumn Header="链接" Binding="{Binding Link}" Width="6*" IsReadOnly="True" MinWidth="66" />
-                                <DataGridTextColumn Header="封面" Binding="{Binding Cover}" Width="6*" IsReadOnly="True" MinWidth="66" />
-                                <DataGridTextColumn Header="简介" Binding="{Binding Summary}" Width="6*" IsReadOnly="True" MinWidth="66" />
-                                <DataGridTextColumn Header="BGM ID" Binding="{Binding BgmId}" Width="12*" IsReadOnly="True" MinWidth="84" />
+                                <!-- 固定像素宽：拖任一列只影响该列自身，剩余空间由最后一列（星号）吸收——
+                 不会出现"拖一列、全部跟着动"的星号重分配 -->
+                                <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="240" IsReadOnly="True" MinWidth="120" />
+                                <DataGridTextColumn Header="文件夹名" Binding="{Binding Folder}" Width="200" IsReadOnly="True" MinWidth="100" />
+                                <DataGridTextColumn Header="册数" Binding="{Binding Count}" Width="60" IsReadOnly="True" MinWidth="48" />
+                                <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="92" IsReadOnly="True" MinWidth="72" />
+                                <DataGridTextColumn Header="链接" Binding="{Binding Link}" Width="60" IsReadOnly="True" MinWidth="48" />
+                                <DataGridTextColumn Header="封面" Binding="{Binding Cover}" Width="60" IsReadOnly="True" MinWidth="48" />
+                                <DataGridTextColumn Header="简介" Binding="{Binding Summary}" Width="60" IsReadOnly="True" MinWidth="48" />
+                                <DataGridTextColumn Header="BGM ID" Binding="{Binding BgmId}" Width="*" IsReadOnly="True" MinWidth="80" />
                             </DataGrid.Columns>
                         </DataGrid>
                         <!-- 拖拽框选覆盖层（橡皮筋；跨平台：Win/Mac 左键拖拽行为一致） -->

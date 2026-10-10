@@ -295,7 +295,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnSeriesDoubleTapped(object? sender, TappedEventArgs e) => _ = EditSeriesEntryAsync();
+    /// <summary>双击行打开编辑。只在行上响应——双击列头/空白不再误触发"编辑单部"提示。</summary>
+    private void OnSeriesDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        var el = e.Source as Visual;
+        while (el is not null && el is not DataGridRow) el = el.Parent as Visual;
+        if (el is DataGridRow row && row.DataContext is SeriesRow sr)
+        {
+            _contextSeries = sr.Series;
+            SeriesGrid.SelectedItem = sr;
+            _ = EditSeriesEntryAsync();
+        }
+    }
 
     // ================= 托盘后台 =================
 
