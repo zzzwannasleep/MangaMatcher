@@ -43,11 +43,49 @@
 
 > NSFW 搜索需在设置中填入 [Bangumi Access Token](https://bgm.tv/settings/api)；部分网络需在设置中配置代理。
 
+---
+
+<div align="center">
+
+## 🐳 Docker/Web 版
+
+**同一套五源匹配链的 Go + Vue3 容器版** · distroless 镜像 **< 30MB** · `amd64` / `arm64`
+
+[![Docker Build](https://img.shields.io/github/actions/workflow/status/zzzwannasleep/MangaMatcher/docker.yml?branch=main&style=flat-square&label=docker%20build&color=2088FF)](https://github.com/zzzwannasleep/MangaMatcher/actions/workflows/docker.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/zzzwannasleep/MangaMatcher/ci.yml?branch=main&style=flat-square&label=tests&color=4CAF50)](https://github.com/zzzwannasleep/MangaMatcher/actions/workflows/ci.yml)
+[![Image](https://img.shields.io/badge/image-ghcr.io%2Fmangamatcher-2088FF?logo=docker&logoColor=white&style=flat-square)](https://github.com/zzzwannasleep/MangaMatcher/pkgs/container/mangamatcher)
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white&style=flat-square)](server/go.mod)
+[![Vue](https://img.shields.io/badge/Vue-3-42B883?logo=vuedotjs&logoColor=white&style=flat-square)](web)
+
+</div>
+
+### 三步部署
+
+```bash
+mkdir komgabangumi && cd komgabangumi
+curl -fsSL https://raw.githubusercontent.com/zzzwannasleep/MangaMatcher/main/docker-compose.yml -o docker-compose.yml
+docker compose up -d
+```
+
+打开 `http://localhost:8080`（默认 `admin / admin123`，首次登录后立即改密码）→ 系统设置里填 Komga 地址 + API Key → 完成。
+
+### Docker/Web 版独有
+
+| | |
+|---|---|
+| 👥 **多角色** | `admin` / `master` 双角色，库级授权——家人只看自己授权的库 |
+| 🖥 **Web UI** | Vue 3 深色审美：封面卡片墙 / 就地编辑大窗 / 贴链接纠正匹配 / 任务差异详情 / 系统日志 |
+| 🏠 **常驻运行** | NAS / 服务器 7×24 刮削，桌面版不开机也能在浏览器里纠错补全 |
+
+📖 **完整部署教程**（compose / docker run / 升级备份 / 权限排障 / 海外代理）：[README-Docker.md](README-Docker.md)
+📋 API 契约：[docs/SPEC.md](docs/SPEC.md) · [docs/SPEC-v2.md](docs/SPEC-v2.md)
+⚙️ CI：镜像构建 [docker.yml](.github/workflows/docker.yml)（`docker-v*` 标签 → GHCR，不构建桌面客户端）· 测试门禁 [ci.yml](.github/workflows/ci.yml)
+
 ## 📖 文档
 
 详细设置项、BookWalker 数据源导入（403 问题）、代理配置、测试驱动等说明见 [完整文档](docs/README-full.md)。
 
-## 🛠 构建
+## 🛠 构建（桌面版）
 
 ```powershell
 dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
@@ -58,30 +96,3 @@ dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj -c Release -r win-x6
 ## 📄 许可
 
 [MIT](LICENSE) · 逻辑移植自 [dyphire/KomgaBangumi](https://github.com/dyphire/KomgaBangumi) 与 [dyphire/KomgaMylar](https://github.com/dyphire/KomgaMylar)
-
----
-
-<div align="center">
-
-## 🐳 Docker/Web 版 · KomgaBangumi
-
-**同一套五源匹配链的 Go + Vue3 容器版** · distroless 运行镜像 **< 30MB**
-
-[![Docker Build](https://img.shields.io/github/actions/workflow/status/zzzwannasleep/MangaMatcher/docker.yml?branch=main&style=flat-square&label=docker%20build&color=2088FF)](https://github.com/zzzwannasleep/MangaMatcher/actions/workflows/docker.yml)
-[![Tests](https://img.shields.io/github/actions/workflow/status/zzzwannasleep/MangaMatcher/ci.yml?branch=main&style=flat-square&label=tests&color=4CAF50)](https://github.com/zzzwannasleep/MangaMatcher/actions/workflows/ci.yml)
-[![Image](https://img.shields.io/badge/image-ghcr.io%2Fmangamatcher-2088FF?logo=docker&logoColor=white&style=flat-square)](https://github.com/zzzwannasleep/MangaMatcher/pkgs/container/mangamatcher)
-[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white&style=flat-square)](server/go.mod)
-[![Vue](https://img.shields.io/badge/Vue-3-42B883?logo=vuedotjs&logoColor=white&style=flat-square)](web)
-
-</div>
-
-| | |
-|---|---|
-| ⚡ **3 步部署** | `docker compose up -d` → `localhost:8080` → 设置页填 Komga 地址即用 |
-| 👥 **多角色** | `admin` / `master` 双角色，库级授权——家人只看自己授权的库 |
-| 🔎 **五源匹配链** | 与桌面版同链：Bangumi → BookWalker → AI → Mox → MangaDex → 百度百科兜底 |
-| 🖥 **Web UI** | Vue 3 深色审美：封面卡片墙 / 就地编辑大窗 / 纠正匹配（贴链接预览）/ 任务差异详情 / 系统日志 |
-
-- 📖 **完整 Docker 部署教程**（compose / docker run / 升级备份 / 权限排障）：[README-Docker.md](README-Docker.md)
-- 📋 API 契约：[docs/SPEC.md](docs/SPEC.md) · [docs/SPEC-v2.md](docs/SPEC-v2.md)
-- ⚙️ CI：镜像构建 [docker.yml](.github/workflows/docker.yml)（`docker-v*` 标签 → GHCR，不构建桌面客户端）· 测试门禁 [ci.yml](.github/workflows/ci.yml)（仅 server/web 路径）
