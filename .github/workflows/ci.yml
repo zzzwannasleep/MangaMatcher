@@ -1,12 +1,20 @@
 name: ci
 
-# 测试门禁：go vet + 全量测试（不含 Docker 镜像构建——见 docker.yml）。
-# 桌面版客户端（KomgaScraper，独立仓库）不在本仓库 CI 范围内。
+# 测试门禁：go vet + 全量测试 + 前端构建（不含 Docker 镜像——见 docker.yml，
+# 不构建桌面版客户端 src/——见 release.yml）。只认 Docker 版路径。
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'server/**'
+      - 'web/**'
+      - '.github/workflows/ci.yml'
   pull_request:
+    paths:
+      - 'server/**'
+      - 'web/**'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 jobs:
