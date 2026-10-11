@@ -171,36 +171,16 @@ tar czf komgabangumi-backup.tgz ./data
 授权   admin 在用户管理给 master 分库；master 只能看到自己的库
 ```
 
-## 🧪 本地开发 / Mock 测试
+## 🧪 本地开发
 
-无需 Docker、无需真实 Komga，六件套 mock 起一个 122 系列的真实数据大库：
+自带六件套 mock（122 系列真实 Bangumi 数据的假库），无需 Docker、无需真实 Komga 即可起全套环境跑测试。
 
 ```powershell
-# 1. mock 全家桶（Komga:25699 / Bangumi:25698 / AI:25697 / Mox:25696 / MangaDex:25695 / 百科:25694）
-node tools/mock-komga.js
-node tools/mock-bangumi.js
-node tools/mock-ai.js
-node tools/mock-mox.js
-node tools/mock-mangadex.js
-node tools/mock-baike.js
-
-# 2. Docker 版后端（env 种子指向 mock）
-$env:DATA_DIR='./server/data'; $env:PORT='8080'
-$env:KOMGA_URL='http://127.0.0.1:25699'; $env:KOMGA_API_KEY='mock-key'
-$env:BANGUMI_API_BASE='http://127.0.0.1:25698'
-$env:MOX_API_BASE='http://127.0.0.1:25696'; $env:MANGADEX_API_BASE='http://127.0.0.1:25695'
-$env:BAIKE_API_BASE='http://127.0.0.1:25694'; $env:MOX_PACE_MS='0'
-go run ./server/cmd/server
-# 浏览器打开 http://localhost:8080（admin/admin123）
-
-# 3. Go 集成测试（httptest 内嵌 mock，无需起服务）
+node tools/mock-komga.js   # 其余 mock 与后端/前端启动方式见开发文档
 go test ./server/... -count=1
-
-# 4. 前端开发模式
-cd web && npm install && npm run dev
 ```
 
-Go 集成测试覆盖：登录鉴权、master 越权 403、admin 建号授权、dry-run 零写入、执行后 PATCH 体校验、五源解析、回退链顺序到百科命中、AI 缓存命中、Mox 520 退避、BW 跨源补空+防串卷、跳过已刮零请求、overrideMatch 语义、编辑器只提交改动字段、Mylar zip 合法、打标 dry-run、状态筛选 6 项、admin 删除保护。
+📖 完整开发指南（mock 全家桶、后端 env、前端 dev、集成测试清单）：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ## 🛠 构建
 
