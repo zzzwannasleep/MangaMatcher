@@ -20,6 +20,7 @@ import (
 	"komgabangumi/internal/scrape"
 	"komgabangumi/internal/sources"
 	"komgabangumi/internal/store"
+	"komgabangumi/internal/update"
 	"komgabangumi/internal/webdist"
 )
 
@@ -35,6 +36,7 @@ type Server struct {
 	komgaBase string // 测试注入：绕过设置的 Komga 客户端工厂（为空时按设置构建）
 	dataDir   string // BW 索引 / 日志 / 直写目录的基准
 	cache     *komgacache.Cache
+	updater   *update.Checker
 }
 
 // NewServer 创建 API 服务器（内部创建任务引擎，Runner 由最新设置构建）。
@@ -43,12 +45,51 @@ func NewServer(st *store.Store, am *auth.Manager, log *slog.Logger) *Server {
 	s.jobs = jobs.NewEngine(s.komgaClient, log, s.newRunner)
 	s.cache = komgacache.New(st.DB(), s.komgaFactory, log)
 	s.jobs.OnDone = s.onJobDone
+	s.updater = update.NewChecker("", nil)
 	return s
 }
 
-// Start 启动库缓存自动刷新（main.go 在 SetDataDir 后调用；集成测试不调用 → 缓存走兜底）。
+// Start 启动库缓存自动刷新 + 更新检查循环（main.go 在 SetDataDir 后调用；集成测试不调用）。
 func (s *Server) Start() {
 	s.cache.Start(s.cacheInterval)
+	go s.updateLoop()
+}
+
+// updateLoop 更新检查：启动 10s 后首查，之后每 24h 一次（设置 update.autoCheck 热更新）。
+// 检查走设置里配置的统一代理（GitHub 直连不通的环境靠它）。
+func (s *Server) updateLoop() {
+	first := time.NewTimer(10 * time.Second)
+	defer first.Stop()
+	for range first.C {
+		s.checkUpdateSoon()
+		// 之后 24h 循环
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			s.checkUpdateSoon()
+		}
+	}
+}
+
+// checkUpdateSoon 按设置构建代理 HTTP 客户端后检查一次。
+func (s *Server) checkUpdateSoon() {
+	st := s.LoadSettings()
+	if !st.Update.AutoCheck {
+		return
+	}
+	pc := sources.ProxyConfig{Protocol: st.Proxy.Protocol, Host: st.Proxy.Host, Port: st.Proxy.Port,
+		Username: st.Proxy.Username, Password: st.Proxy.Password}
+	var hc *http.Client
+	if pc.IsSet() {
+		if c, err := sources.NewHTTPClient(pc, 20*time.Second, "KomgaBangumi-Docker", ""); err == nil {
+			hc = c
+		}
+	}
+	s.updater.SetClient(hc)
+	_, err := s.updater.Check()
+	if err != nil {
+		s.log.Warn("更新检查失败: " + err.Error())
+	}
 }
 
 // cacheInterval 缓存自动刷新间隔（设置热更新；<=0 = 关闭自动刷新）。
@@ -149,6 +190,10 @@ func (s *Server) Router() http.Handler {
 	authed.Handle("GET /api/cache/status", s.admin(s.handleCacheStatus))
 	authed.Handle("POST /api/cache/refresh", s.admin(s.handleCacheRefresh))
 
+	// 自动更新检查（admin only）
+	authed.Handle("GET /api/update/status", s.admin(s.handleUpdateStatus))
+	authed.Handle("POST /api/update/check", s.admin(s.handleUpdateCheck))
+
 	mux.Handle("/api/", s.auth.Middleware(authed))
 
 	// SPA fallback：非 /api 路径全部走嵌入前端
@@ -200,7 +245,15 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 
 // handleHealth GET /api/health（免认证）。
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"ok": true, "version": Version})
+	writeJSON(w, 200, map[string]any{"ok": true, "version": buildVersionOr()})
+}
+
+// buildVersionOr 优先返回构建注入的版本（Docker 镜像 = 实际版本号），否则退回 API 契约常量。
+func buildVersionOr() string {
+	if v := update.Current(); v != "" && v != "dev" {
+		return v
+	}
+	return Version
 }
 
 // komgaClient 按当前设置构建 Komga 客户端（测试可覆盖）。

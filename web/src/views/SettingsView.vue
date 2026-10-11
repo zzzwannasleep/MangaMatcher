@@ -38,6 +38,7 @@ const form = reactive({
   versionTagBlacklistText: '',
   comicsDir: '',
   cache: { enabled: true, refreshMinutes: 60 },
+  update: { autoCheck: true },
 })
 
 // 后端对密钥打码返回 "****"：输入框留空 = 不修改
@@ -99,6 +100,7 @@ async function load() {
     const cache = data.cache || {}
     form.cache.enabled = cache.enabled !== false
     form.cache.refreshMinutes = cache.refreshMinutes ?? 60
+    form.update.autoCheck = data.update?.autoCheck !== false
 
     komgaKeyMasked.value = !!data.komgaApiKey
     bangumiMasked.value = !!data.bangumiToken
@@ -106,6 +108,7 @@ async function load() {
     proxyPasswordMasked.value = !!proxy.password
     refreshBwStatus()
     refreshCacheStatus()
+    refreshUpdateStatus()
   } catch (err) {
     loadError.value = err.message
     notify.error(err.message)
@@ -196,6 +199,9 @@ async function save() {
       cache: {
         enabled: form.cache.enabled,
         refreshMinutes: Number(form.cache.refreshMinutes) || 0,
+      },
+      update: {
+        autoCheck: form.update.autoCheck,
       },
     }
     await api('/api/settings', { method: 'PATCH', body: patch })
@@ -329,6 +335,44 @@ function stopCachePoll() {
     clearInterval(cacheTimer)
     cacheTimer = null
   }
+}
+
+/* ---------- 软件更新（Docker 版：检查新版本 → 引导 docker compose pull） ---------- */
+const updateStatus = ref(null) // { current, autoCheck, checking, latest?, hasUpdate?, releaseUrl?, checkedAt?, error? }
+const updateChecking = ref(false)
+
+async function refreshUpdateStatus() {
+  try {
+    updateStatus.value = await api('/api/update/status')
+  } catch {
+    /* 状态拿不到不阻塞设置页 */
+  }
+}
+
+async function updateCheckNow() {
+  updateChecking.value = true
+  try {
+    updateStatus.value = await api('/api/update/check', { method: 'POST', body: {} })
+    const st = updateStatus.value
+    if (st.error && !st.latest) notify.error(`检查更新失败：${st.error}`)
+    else if (st.hasUpdate) notify.success(`发现新版本 v${st.latest}（当前 v${st.current}）`)
+    else notify.success(`已是最新版本 v${st.current}`)
+  } catch (err) {
+    notify.error(err.message)
+  } finally {
+    updateChecking.value = false
+  }
+}
+
+function checkedAgoText(checkedAt) {
+  const ms = Date.now() - new Date(checkedAt).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return ''
+  const min = Math.floor(ms / 60000)
+  if (min < 1) return '刚刚'
+  if (min < 60) return `${min} 分钟前`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `${h} 小时前`
+  return `${Math.floor(h / 24)} 天前`
 }
 
 onMounted(load)
@@ -527,6 +571,44 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <p class="field-hint">Komga 地址或密钥变更时缓存会自动清空重建，不会出现串库数据。</p>
+      </section>
+
+      <section class="card card-pad section">
+        <h2 class="section-title">软件更新</h2>
+
+        <label class="toggle-row">
+          <input type="checkbox" v-model="form.update.autoCheck" />
+          <span>
+            <strong>启动时自动检查更新</strong>
+            <small>启动 10 秒后检查一次，之后每 24 小时一次；检查走设置里的代理</small>
+          </span>
+        </label>
+
+        <div v-if="updateStatus" class="update-status">
+          <span class="num update-version">当前版本 v{{ updateStatus.current }}</span>
+          <span v-if="updateStatus.latest" class="num update-version">最新 v{{ updateStatus.latest }}</span>
+          <span v-if="updateStatus.checkedAt" class="update-meta">上次检查 {{ checkedAgoText(updateStatus.checkedAt) }}</span>
+          <button class="btn btn-sm" type="button" :data-loading="updateChecking" :disabled="updateChecking || updateStatus.checking" @click="updateCheckNow">
+            <span v-if="updateChecking || updateStatus.checking" class="spinner" aria-hidden="true"></span>
+            {{ (updateChecking || updateStatus.checking) ? '检查中…' : '立即检查' }}
+          </button>
+        </div>
+
+        <div v-if="updateStatus?.error && !updateStatus?.latest" class="update-error" :title="updateStatus.error">
+          ⚠ {{ updateStatus.error }}
+        </div>
+
+        <div v-if="updateStatus?.hasUpdate" class="update-banner">
+          <p class="update-banner-title">有新版本 v{{ updateStatus.latest }} 可用</p>
+          <p class="update-banner-body">
+            容器无法原地替换，请在宿主机执行：
+            <code>docker compose pull &amp;&amp; docker compose up -d</code>
+          </p>
+          <a class="update-banner-link" :href="updateStatus.releaseUrl" target="_blank" rel="noopener">
+            查看镜像发布页 ↗
+          </a>
+        </div>
+        <p v-else class="field-hint">容器更新方式：宿主机 <code>docker compose pull &amp;&amp; docker compose up -d</code>，或启用 Watchtower 全自动。</p>
       </section>
 
       <section class="card card-pad section">
@@ -820,6 +902,65 @@ onBeforeUnmount(() => {
 .cache-meta {
   font-size: 12.5px;
   color: var(--text-1);
+}
+
+/* ---- 软件更新 ---- */
+.update-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.update-version {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.update-meta {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.update-error {
+  font-size: 12.5px;
+  color: var(--err);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-banner {
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+  border-radius: var(--radius-m);
+  background: var(--ok-soft);
+}
+
+.update-banner-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ok);
+  margin-bottom: 4px;
+}
+
+.update-banner-body {
+  font-size: 12.5px;
+  color: var(--text-1);
+  margin-bottom: 6px;
+}
+
+.update-banner-body code {
+  padding: 1px 6px;
+  border-radius: var(--radius-s);
+  background: var(--bg-inset);
+  font-size: 12px;
+}
+
+.update-banner-link {
+  font-size: 12.5px;
+  color: var(--accent, var(--text-0));
 }
 
 

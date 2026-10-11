@@ -20,6 +20,7 @@ import (
 	"komgabangumi/internal/komga"
 	"komgabangumi/internal/scrape"
 	"komgabangumi/internal/sources"
+	"komgabangumi/internal/update"
 )
 
 // ============================================================
@@ -1257,6 +1258,41 @@ func (s *Server) handleCacheRefresh(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+// ---------- 11. 自动更新检查 ----------
+
+// handleUpdateStatus GET /api/update/status → 最近一次检查结果（无网络调用）。
+func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	st := s.LoadSettings()
+	last := s.updater.Last()
+	out := map[string]any{
+		"current":   update.Current(),
+		"autoCheck": st.Update.AutoCheck,
+		"checking":  s.updater.Checking(),
+	}
+	if last != nil {
+		out["latest"] = last.Latest
+		out["hasUpdate"] = last.HasUpdate
+		out["releaseUrl"] = last.ReleaseURL
+		out["checkedAt"] = last.CheckedAt
+		out["error"] = last.Error
+	}
+	writeJSON(w, 200, out)
+}
+
+// handleUpdateCheck POST /api/update/check → 立即检查（同步，最多 ~20s）。
+func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	st, err := s.updater.Check()
+	if err != nil || st == nil {
+		if st == nil {
+			writeError(w, 502, "检查更新失败")
+			return
+		}
+		writeJSON(w, 200, st) // 带错误信息的快照也返回（前端展示失败原因）
+		return
+	}
+	writeJSON(w, 200, st)
 }
 
 // ---------- 源客户端构建（候选/详情端点共用） ----------

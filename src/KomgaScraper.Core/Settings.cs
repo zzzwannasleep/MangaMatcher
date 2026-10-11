@@ -66,6 +66,9 @@ public sealed class AppSettings
     /// <summary>库缓存自动对齐间隔（分钟，0=关闭自动对齐；元数据写入后总会即时回源）。</summary>
     [JsonPropertyName("cacheRefreshMinutes")] public int CacheRefreshMinutes { get; set; } = 60;
 
+    /// <summary>自动检查更新（启动后台查 GitHub Releases 最新桌面版；可手动关闭）。</summary>
+    [JsonPropertyName("updateAutoCheck")] public bool UpdateAutoCheck { get; set; } = true;
+
     /// <summary>标记白名单：文件夹名后缀命中即保留为标签（内置词表认不出的也能按用户口径落）。</summary>
     [JsonPropertyName("tagWhitelist")] public List<string> TagWhitelist { get; set; } = [];
     /// <summary>标记黑名单：命中的后缀不落标签，标题里残留的旧后缀也会被清掉。</summary>

@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using KomgaScraper.Core;
 using KomgaScraper.Core.Sources;
+using KomgaScraper.Core.Update;
 
 namespace KomgaScraper.App;
 
@@ -48,15 +49,25 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox _chkKomgaProxy = new() { Content = "Komga 连接走代理（本机/内网部署保持关闭）" };
     private readonly CheckBox _chkCacheEnabled = new() { Content = "启用本地库缓存（打开软件即出数据，不重复拉全库）" };
     private readonly NumericUpDown _numCacheRefresh = new() { Minimum = 0, Maximum = 10080, Value = 60, Width = 110 };
+    private readonly CheckBox _chkUpdateAuto = new() { Content = "启动时自动检查更新（GitHub Releases）" };
+    private readonly Button _btnUpdateCheck = new() { Content = "检查更新", Classes = { "app" } };
+    private readonly Button _btnUpdateInstall = new() { Content = "下载并安装", Classes = { "primary" }, IsVisible = false };
+    private readonly TextBlock _lblUpdateStatus = new() { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+    private readonly Func<Task<UpdateStatus?>>? _checkUpdate;
+    private readonly Func<UpdateStatus, Task>? _installUpdate;
     private readonly TextBox _txtTagWhitelist = new() { AcceptsReturn = true, Height = 56, TextWrapping = TextWrapping.Wrap };
     private readonly TextBox _txtTagBlacklist = new() { AcceptsReturn = true, Height = 56, TextWrapping = TextWrapping.Wrap };
 
     private string _lastProxyScheme = "http";
     private readonly Grid _grid = new();
 
-    public SettingsWindow(AppSettings current)
+    public SettingsWindow(AppSettings current,
+        Func<Task<UpdateStatus?>>? checkUpdate = null,
+        Func<UpdateStatus, Task>? installUpdate = null)
     {
         _current = current;
+        _checkUpdate = checkUpdate;
+        _installUpdate = installUpdate;
         Title = "设置";
         Width = 680;
         Height = 780;
@@ -92,6 +103,7 @@ public sealed class SettingsWindow : Window
         _chkKomgaProxy.IsChecked = current.KomgaProxyEnabled;
         _chkCacheEnabled.IsChecked = current.CacheEnabled;
         _numCacheRefresh.Value = Math.Clamp(current.CacheRefreshMinutes, 0, 10080);
+        _chkUpdateAuto.IsChecked = current.UpdateAutoCheck;
         _numConcurrency.Value = Math.Clamp(current.ScrapeConcurrency, 1, 8);
         _cmbMatchType.SelectedItem = current.MatchType;
         _txtTagWhitelist.Text = string.Join("\r\n", current.TagWhitelist);
@@ -158,6 +170,8 @@ public sealed class SettingsWindow : Window
         _btnBwDownload.Click += async (_, _) => await DownloadBwIndexAsync();
         _btnBwOpen.Click += (_, _) => OpenBwDownloadPage();
         _btnBwImport.Click += async (_, _) => await ImportBwIndexAsync();
+        _btnUpdateCheck.Click += async (_, _) => await CheckUpdateClickAsync();
+        _btnUpdateInstall.Click += async (_, _) => await InstallUpdateClickAsync();
     }
 
     // ================= 网格构建 =================
@@ -284,6 +298,22 @@ public sealed class SettingsWindow : Window
         Field("自动对齐", cacheRow);
         Hint("库/系列数据存 data\\library-cache.json：打开软件直接出列表，后台静默对齐 Komga。\r\n" +
              "元数据/封面写入后立即回源缓存；Komga 地址或密钥变更时缓存自动清空重建。");
+
+        Section("软件更新");
+        Field("当前版本", new TextBlock
+        {
+            Text = "v" + UpdateService.CurrentVersion(),
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12.5,
+        });
+        Field("自动检查", _chkUpdateAuto);
+        var updRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+        updRow.Children.Add(_btnUpdateCheck);
+        updRow.Children.Add(_btnUpdateInstall);
+        updRow.Children.Add(_lblUpdateStatus);
+        Field("更新", updRow);
+        Hint("检查与下载走 设置 → 代理 的统一代理（GitHub 直连不通时必配）。" +
+             "安装：新版本下载后自动替换程序文件并重启，数据目录不受影响。");
 
         Section("版本标记（黑白名单）");
         Field("白名单", _txtTagWhitelist);
@@ -419,6 +449,77 @@ public sealed class SettingsWindow : Window
         public void Progress(int c, int t, string m) => status(m);
     }
 
+    // ================= 软件更新 =================
+
+    private async Task CheckUpdateClickAsync()
+    {
+        if (_checkUpdate == null)
+        {
+            _lblUpdateStatus.Text = "此窗口未接入更新检查";
+            return;
+        }
+        _btnUpdateCheck.IsEnabled = false;
+        _lblUpdateStatus.Text = "检查中…";
+        try
+        {
+            var st = await _checkUpdate();
+            if (st == null)
+            {
+                _lblUpdateStatus.Text = "检查失败（见主窗口日志）";
+                return;
+            }
+            if (st.Error.Length > 0 && st.Latest.Length == 0)
+            {
+                _lblUpdateStatus.Text = $"检查失败：{st.Error}";
+                return;
+            }
+            if (st.HasUpdate)
+            {
+                _lblUpdateStatus.Text = $"发现新版本 v{st.Latest}（当前 v{st.Current}）";
+                _btnUpdateInstall.IsVisible = true;
+            }
+            else
+            {
+                _lblUpdateStatus.Text = $"已是最新（v{st.Current}）";
+                _btnUpdateInstall.IsVisible = false;
+            }
+        }
+        finally
+        {
+            _btnUpdateCheck.IsEnabled = true;
+        }
+    }
+
+    private async Task InstallUpdateClickAsync()
+    {
+        if (_installUpdate == null || _checkUpdate == null) return;
+        _btnUpdateInstall.IsEnabled = false;
+        _lblUpdateStatus.Text = "下载中…（视网络可能需要一会儿）";
+        try
+        {
+            var st = await _checkUpdate();
+            if (st == null || !st.HasUpdate || st.AssetUrl.Length == 0)
+            {
+                _lblUpdateStatus.Text = "没有可安装的更新";
+                _btnUpdateInstall.IsVisible = false;
+                return;
+            }
+            SetUpdateBusy(true);
+            await _installUpdate(st);   // 不返回：安装后程序重启
+        }
+        catch (Exception e)
+        {
+            _lblUpdateStatus.Text = $"更新失败：{e.Message}";
+            SetUpdateBusy(false);
+        }
+    }
+
+    private void SetUpdateBusy(bool busy)
+    {
+        _btnUpdateCheck.IsEnabled = !busy;
+        _btnUpdateInstall.IsEnabled = !busy;
+    }
+
     /// <summary>下拉项：界面显示中文标签，值存协议名。</summary>
     private sealed record ProxyItem(string Scheme, string Label)
     {
@@ -491,5 +592,6 @@ public sealed class SettingsWindow : Window
         KomgaProxyEnabled = _chkKomgaProxy.IsChecked == true,
         CacheEnabled = _chkCacheEnabled.IsChecked == true,
         CacheRefreshMinutes = (int)_numCacheRefresh.Value,
+        UpdateAutoCheck = _chkUpdateAuto.IsChecked == true,
     };
 }

@@ -38,6 +38,11 @@ type CacheSettings struct {
 	RefreshMinutes int  `json:"refreshMinutes"` // 自动对齐间隔（分钟；0=关闭自动刷新）
 }
 
+// UpdateSettings 自动更新检查配置（Docker 版：检查新版本 → 提示引导更新）。
+type UpdateSettings struct {
+	AutoCheck bool `json:"autoCheck"` // 启动后自动检查（每 24h 一次）；关掉仍可手动检查
+}
+
 // Settings 全局设置（SPEC-v2 第 1 节 + v1 已有字段）。
 // 秘钥字段 GET 返回 "****" 打码；PATCH 传 "****" 或空表示不修改。
 type Settings struct {
@@ -66,6 +71,7 @@ type Settings struct {
 	VersionTagBlacklist []string           `json:"versionTagBlacklist"`
 	ComicsDir           string             `json:"comicsDir"`
 	Cache               CacheSettings      `json:"cache"`
+	Update              UpdateSettings     `json:"update"`
 
 	// 内部：DATA_DIR（不进 JSON）
 	DataDir string `json:"-"`
@@ -87,6 +93,7 @@ func (s *Server) LoadSettings() Settings {
 		BaikeEnabled:         true,
 		MangaDexEnabled:      true,
 		Cache:                CacheSettings{Enabled: true, RefreshMinutes: 60},
+		Update:               UpdateSettings{AutoCheck: true},
 		BookWalker: BookWalkerSettings{
 			DownloadURL: "https://data.bookwalker.com/bkwk-db.sqlite.zst",
 			WriteExtras: true,
@@ -156,6 +163,9 @@ func (s *Server) LoadSettings() Settings {
 				if saved.Cache.RefreshMinutes >= 0 {
 					st.Cache.RefreshMinutes = saved.Cache.RefreshMinutes
 				}
+			}
+			if rawHasKeyAny(v, "update") {
+				st.Update.AutoCheck = saved.Update.AutoCheck
 			}
 		}
 	} else {
@@ -401,6 +411,14 @@ func (st Settings) ApplyPatch(body json.RawMessage) (Settings, error) {
 					n = 1440
 				}
 				cp.Cache.RefreshMinutes = n
+			}
+		}
+	}
+	if raw, ok := patch["update"]; ok {
+		var um map[string]any
+		if json.Unmarshal(raw, &um) == nil {
+			if b, ok := um["autoCheck"].(bool); ok {
+				cp.Update.AutoCheck = b
 			}
 		}
 	}

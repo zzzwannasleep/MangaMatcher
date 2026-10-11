@@ -17,6 +17,7 @@ using KomgaScraper.Core.Mylar;
 using KomgaScraper.Core.Scraping;
 using KomgaScraper.Core.Sources;
 using KomgaScraper.Core.Text;
+using KomgaScraper.Core.Update;
 
 namespace KomgaScraper.App;
 
@@ -42,6 +43,10 @@ public sealed partial class MainWindow : Window
     private ScrapeStateStore? _state;
     private LibraryCache? _libCache;
     private DispatcherTimer? _libCacheTimer;
+
+    // 自动更新（GitHub Releases 检查 + 下载 + 原地替换重启）
+    private UpdateService? _updater;
+    private UpdateStatus? _updateStatus;
 
     private List<LibraryDto> _libraries = [];
     private readonly Dictionary<string, SeriesDto> _seriesCache = new();
@@ -107,6 +112,10 @@ public sealed partial class MainWindow : Window
 
         // 本地库缓存：打开即用（不重新连接拉全库），后台自动对齐
         RestoreCacheView();
+
+        // 自动更新：清理上次自更新残留 + 启动后台检查（GitHub Releases）
+        UpdateService.CleanupOldFiles();
+        StartUpdateCheck();
     }
 
     private string DryRunText => _settings.DryRun

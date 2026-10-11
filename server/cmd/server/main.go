@@ -22,7 +22,11 @@ import (
 	"komgabangumi/internal/api"
 	"komgabangumi/internal/auth"
 	"komgabangumi/internal/store"
+	"komgabangumi/internal/update"
 )
+
+// version 由构建注入（Dockerfile ldflags -X main.version；本地 dev 构建 = dev）。
+var version = "dev"
 
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
@@ -107,6 +111,8 @@ func main() {
 	}
 
 	am := auth.NewManager(secret)
+	update.SetBuildVersion(version)
+	log.Info("构建版本: " + version)
 	server := api.NewServer(st, am, log)
 	server.SetDataDir(dataDir)
 	server.Start() // 库缓存：从 SQLite 恢复 + 自动对齐 Komga（间隔由设置驱动）

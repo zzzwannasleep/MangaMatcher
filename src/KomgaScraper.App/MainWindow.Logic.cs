@@ -6,6 +6,7 @@ using KomgaScraper.Core.Mylar;
 using KomgaScraper.Core.Scraping;
 using KomgaScraper.Core.Sources;
 using KomgaScraper.Core.Text;
+using KomgaScraper.Core.Update;
 
 namespace KomgaScraper.App;
 
@@ -321,6 +322,60 @@ public sealed partial class MainWindow
         }
     }
 
+    // ================= 自动更新（GitHub Releases） =================
+
+    private void StartUpdateCheck()
+    {
+        _updater = new UpdateService(new RelayLogger(m => Log("INFO", m), m => Log("WARN", m)),
+            () => _settings.Proxy);
+        if (!_settings.UpdateAutoCheck) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(12));   // 等网络与代理就绪
+                _updateStatus = await _updater.CheckAsync(CancellationToken.None);
+                if (_updateStatus.HasUpdate)
+                    Log("INFO", $"有新版本可用：v{_updateStatus.Latest}（设置 → 软件更新 里一键升级）");
+            }
+            catch { /* 检查失败静默（日志已记） */ }
+        });
+    }
+
+    /// <summary>手动检查更新（设置窗口按钮调用）。返回最新状态快照。</summary>
+    public async Task<UpdateStatus?> CheckUpdateManualAsync()
+    {
+        _updater ??= new UpdateService(new RelayLogger(m => Log("INFO", m), m => Log("WARN", m)),
+            () => _settings.Proxy);
+        try
+        {
+            _updateStatus = await _updater.CheckAsync(CancellationToken.None);
+            return _updateStatus;
+        }
+        catch (Exception e)
+        {
+            Log("WARN", $"检查更新失败: {e.Message}");
+            return _updateStatus;
+        }
+    }
+
+    /// <summary>下载新版本并重启安装（设置窗口按钮调用）。全程日志留痕。</summary>
+    public async Task DownloadAndInstallAsync(UpdateStatus status)
+    {
+        var zip = await _updater!.DownloadAsync(status, CancellationToken.None);
+        Log("INFO", "正在解压并安装新版本…（程序将自动重启）");
+        var pending = _updater.ExtractPending(zip);
+        UpdateService.InstallAndRestart(pending);   // 不返回：新进程启动 + 当前退出
+    }
+
+    private sealed class RelayLogger(Action<string> info, Action<string> warn) : IAppLogger
+    {
+        public void Info(string m) => info(m);
+        public void Warn(string m) => warn(m);
+        public void Error(string m) => warn(m);
+        public void Progress(int c, int t, string m) => info(m);
+    }
+
     private async Task TestConnectionAsync()
     {
         if (_komga == null) return;
@@ -355,7 +410,9 @@ public sealed partial class MainWindow
 
     private async Task OpenSettingsAsync()
     {
-        var dlg = new SettingsWindow(_settings);
+        var dlg = new SettingsWindow(_settings,
+            checkUpdate: async () => await CheckUpdateManualAsync(),
+            installUpdate: async st => await DownloadAndInstallAsync(st));
         if (await dlg.ShowDialog<bool>(this))
         {
             _settings = dlg.EditedSettings;
