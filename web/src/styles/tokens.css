@@ -1,0 +1,74 @@
+/* ============================================================
+   KomgaBangumi · Design Tokens
+   深色漫画审美 · 单 accent（朱红 vermilion）· 8px 网格
+   ============================================================ */
+:root {
+  /* --- 表面 --- */
+  --bg-0: #0b0c10; /* 页面底色 */
+  --bg-1: #12141a; /* 顶栏 / 大面 */
+  --bg-2: #191c24; /* 卡片 */
+  --bg-3: #21252f; /* 抬升层 / hover 面 */
+  --bg-inset: #0e1015; /* 输入框 / 内嵌区 */
+
+  /* --- 文本 --- */
+  --text-0: #eceef3; /* 主文本 */
+  --text-1: #9aa1b0; /* 次级文本 */
+  --text-2: #666d7c; /* 弱化 / 占位 */
+
+  /* --- 线 --- */
+  --line-1: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.13);
+
+  /* --- 品牌 accent：朱红（唯一主色） --- */
+  --accent: #e8604c;
+  --accent-strong: #f47a63;
+  --accent-soft: rgba(232, 96, 76, 0.14);
+  --accent-line: rgba(232, 96, 76, 0.45);
+  --on-accent: #160704;
+
+  /* --- 语义色（仅状态，不作装饰） --- */
+  --ok: #4cc38a;
+  --ok-soft: rgba(76, 195, 138, 0.14);
+  --warn: #e0b04c;
+  --warn-soft: rgba(224, 176, 76, 0.14);
+  --err: #e5484d;
+  --err-soft: rgba(229, 72, 77, 0.15);
+  --info: #6aa7e8;
+  --info-soft: rgba(106, 167, 232, 0.14);
+  --manual: #a08ae0;
+  --manual-soft: rgba(160, 138, 224, 0.16);
+
+  /* --- 圆角 --- */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+  --radius-full: 999px;
+
+  /* --- 8px 网格间距 --- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-6: 24px;
+  --s-8: 32px;
+
+  /* --- 阴影 --- */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-accent: 0 0 0 1px var(--accent-line);
+
+  /* --- 动效 ---
+     --t-med 是「时长+函数」简写，只能整段用于 animation/无显式时长的 transition；
+     已写明时长的 transition 必须用 --ease-out，否则第二个时间值会变成 delay（折叠动画不同步事故根因） */
+  --t-fast: 0.14s ease;
+  --t-med: 0.24s cubic-bezier(0.2, 0.8, 0.3, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
+
+  /* --- 字体 --- */
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  --font-mono:
+    ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas,
+    'SF Mono', monospace;
+}

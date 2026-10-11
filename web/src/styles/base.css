@@ -1,0 +1,454 @@
+/* ============ 基础 / 重置 ============ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-0);
+  background:
+    radial-gradient(1200px 500px at 80% -10%, rgba(232, 96, 76, 0.055), transparent 60%),
+    var(--bg-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+::selection {
+  background: var(--accent-line);
+  color: #fff;
+}
+
+/* 数字统一等宽对齐 */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============ 页头（通用 page header） ============ */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-6);
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+}
+
+.page-sub {
+  color: var(--text-1);
+  font-size: 13px;
+  margin-top: var(--s-1);
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* 按钮基线重置：UA 默认 padding(1px 6px) 会把固定尺寸图标按钮的内容盒挤偏，
+   SVG 贴左缘 → 圆形开关内箭头不居中（实测偏移 +2.67px）。.btn 自带 padding 不受影响。 */
+button {
+  padding: 0;
+}
+
+/* ============ 按钮 ============ */
+.btn {
+  --btn-bg: var(--bg-3);
+  --btn-fg: var(--text-0);
+  --btn-line: var(--line-2);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--btn-line);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-fast),
+    color var(--t-fast),
+    box-shadow var(--t-fast),
+    transform 80ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  --btn-bg: #282d38;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  --btn-bg: var(--accent);
+  --btn-fg: var(--on-accent);
+  --btn-line: transparent;
+  font-weight: 650;
+}
+
+.btn-primary:hover:not(:disabled) {
+  --btn-bg: var(--accent-strong);
+  box-shadow: 0 4px 16px rgba(232, 96, 76, 0.28);
+}
+
+.btn-ghost {
+  --btn-bg: transparent;
+  --btn-fg: var(--text-1);
+  --btn-line: transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  --btn-bg: var(--bg-3);
+  --btn-fg: var(--text-0);
+}
+
+.btn-danger {
+  --btn-fg: var(--err);
+  --btn-line: color-mix(in srgb, var(--err) 35%, transparent);
+  --btn-bg: transparent;
+}
+
+.btn-danger:hover:not(:disabled) {
+  --btn-bg: var(--err-soft);
+}
+
+.btn-sm {
+  height: 30px;
+  padding: 0 11px;
+  font-size: 12.5px;
+}
+
+/* 按钮 loading 态 */
+.btn[data-loading='true'] {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.btn .spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+/* ============ 输入 / 表单 ============ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-1);
+  letter-spacing: 0.02em;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.input,
+.select {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-2);
+  background: var(--bg-inset);
+  color: var(--text-0);
+  font-family: inherit;
+  font-size: 14px;
+  width: 100%;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.input::placeholder {
+  color: var(--text-2);
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--err);
+}
+
+.select {
+  appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%239aa1b0' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+textarea.input {
+  height: auto;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 表单纵向排布 */
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+/* ============ 卡片 ============ */
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+}
+
+.card-pad {
+  padding: var(--s-6);
+}
+
+/* ============ 表格 ============ */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line-1);
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background-color var(--t-fast);
+}
+
+.table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-2);
+}
+
+.table-wrap .table th:first-child,
+.table-wrap .table td:first-child {
+  padding-left: 16px;
+}
+
+.table-wrap .table th:last-child,
+.table-wrap .table td:last-child {
+  padding-right: 16px;
+}
+
+/* ============ 徽章 ============ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line-2);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.badge--ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: transparent;
+}
+
+.badge--failed {
+  color: var(--err);
+  background: var(--err-soft);
+  border-color: transparent;
+}
+
+.badge--manual {
+  color: var(--manual);
+  background: var(--manual-soft);
+  border-color: transparent;
+}
+
+.badge--skipped {
+  color: var(--text-2);
+  background: var(--bg-3);
+  border-color: transparent;
+}
+
+.badge--dry {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: transparent;
+}
+
+.badge--running {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: transparent;
+}
+
+/* ============ 加载 spinner ============ */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid var(--line-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 64px 0;
+  color: var(--text-1);
+}
+
+/* ============ 页面过渡（fade + slide） ============ */
+.page-enter-active {
+  transition: opacity 0.24s var(--ease-out), transform 0.24s var(--ease-out);
+}
+
+.page-leave-active {
+  transition: opacity 0.14s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+}
+
+/* ============ 卡片 hover 浮起 ============ */
+.lift {
+  transition: transform var(--t-med), box-shadow var(--t-med), border-color var(--t-med);
+}
+
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--line-2);
+}
+
+/* ============ reduced motion ============ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

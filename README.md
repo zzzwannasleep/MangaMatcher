@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 # KomgaScraper
 
@@ -58,3 +58,14 @@ dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj -c Release -r win-x6
 ## 📄 许可
 
 [MIT](LICENSE) · 逻辑移植自 [dyphire/KomgaBangumi](https://github.com/dyphire/KomgaBangumi) 与 [dyphire/KomgaMylar](https://github.com/dyphire/KomgaMylar)
+
+---
+
+## 🐳 Docker/Web 版（KomgaBangumi）
+
+同一刮削逻辑的 **Go + Vue3 容器版**：多角色账号系统（admin/master）、go:embed 单二进制、distroless 运行镜像（< 30MB）。
+
+- 产品说明与本地开发：[README-Docker.md](README-Docker.md)
+- API 契约：[docs/SPEC.md](docs/SPEC.md) · [docs/SPEC-v2.md](docs/SPEC-v2.md)
+- 部署：[docker-compose.yml](docker-compose.yml)
+- CI：镜像构建 [docker.yml](.github/workflows/docker.yml)（`docker-v*` 标签 → `ghcr.io/zzzwannasleep/mangamatcher`，不构建桌面客户端）；测试门禁 [ci.yml](.github/workflows/ci.yml)（仅 server/web 路径）

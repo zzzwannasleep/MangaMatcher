@@ -1,0 +1,14 @@
+# 构建上下文瘦身：Docker 构建只需要 server/ 与 web/
+KomgaScraper/
+reference/
+.toolchain/
+data/
+server/data/
+server/bin/
+web/node_modules/
+web/dist/
+tools/
+docs/
+*.md
+.github/
+.git/

@@ -1,4 +1,4 @@
-# Build artifacts
+﻿# Build artifacts
 bin/
 obj/
 dist/
@@ -22,3 +22,24 @@ trace-*.txt
 
 # UI audit screenshots（本地验证用，不入库）
 .audit/
+
+# ===== Docker/Web 版（komgabangumi-docker 并入本仓库） =====
+.toolchain/
+data/
+server/data/
+server/bin/
+web/node_modules/
+web/dist/
+web/.vite/
+server/internal/webdist/dist/*
+!server/internal/webdist/dist/.gitkeep
+*.exe
+
+# 本地参考用的桌面版克隆（正式源码在 src/）
+KomgaScraper/
+reference/
+
+# 通用
+*.zip
+.audit/
+trace-*.txt
