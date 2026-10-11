@@ -7,6 +7,14 @@ on:
       - "**.md"
       - "docs/**"
       - "screenshots/**"
+      # Docker/Web 版（由 docker.yml / ci.yml 负责，桌面构建不跑）
+      - "server/**"
+      - "web/**"
+      - "tools/**"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/docker.yml"
+      - ".github/workflows/ci.yml"
   workflow_dispatch:
 
 permissions:
