@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # KomgaScraper
 
@@ -61,11 +61,27 @@ dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj -c Release -r win-x6
 
 ---
 
-## 🐳 Docker/Web 版（KomgaBangumi）
+<div align="center">
 
-同一刮削逻辑的 **Go + Vue3 容器版**：多角色账号系统（admin/master）、go:embed 单二进制、distroless 运行镜像（< 30MB）。
+## 🐳 Docker/Web 版 · KomgaBangumi
 
-- 产品说明与本地开发：[README-Docker.md](README-Docker.md)
-- API 契约：[docs/SPEC.md](docs/SPEC.md) · [docs/SPEC-v2.md](docs/SPEC-v2.md)
-- 部署：[docker-compose.yml](docker-compose.yml)
-- CI：镜像构建 [docker.yml](.github/workflows/docker.yml)（`docker-v*` 标签 → `ghcr.io/zzzwannasleep/mangamatcher`，不构建桌面客户端）；测试门禁 [ci.yml](.github/workflows/ci.yml)（仅 server/web 路径）
+**同一套五源匹配链的 Go + Vue3 容器版** · distroless 运行镜像 **< 30MB**
+
+[![Docker Build](https://img.shields.io/github/actions/workflow/status/zzzwannasleep/MangaMatcher/docker.yml?branch=main&style=flat-square&label=docker%20build&color=2088FF)](https://github.com/zzzwannasleep/MangaMatcher/actions/workflows/docker.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/zzzwannasleep/MangaMatcher/ci.yml?branch=main&style=flat-square&label=tests&color=4CAF50)](https://github.com/zzzwannasleep/MangaMatcher/actions/workflows/ci.yml)
+[![Image](https://img.shields.io/badge/image-ghcr.io%2Fmangamatcher-2088FF?logo=docker&logoColor=white&style=flat-square)](https://github.com/zzzwannasleep/MangaMatcher/pkgs/container/mangamatcher)
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white&style=flat-square)](server/go.mod)
+[![Vue](https://img.shields.io/badge/Vue-3-42B883?logo=vuedotjs&logoColor=white&style=flat-square)](web)
+
+</div>
+
+| | |
+|---|---|
+| ⚡ **3 步部署** | `docker compose up -d` → `localhost:8080` → 设置页填 Komga 地址即用 |
+| 👥 **多角色** | `admin` / `master` 双角色，库级授权——家人只看自己授权的库 |
+| 🔎 **五源匹配链** | 与桌面版同链：Bangumi → BookWalker → AI → Mox → MangaDex → 百度百科兜底 |
+| 🖥 **Web UI** | Vue 3 深色审美：封面卡片墙 / 就地编辑大窗 / 纠正匹配（贴链接预览）/ 任务差异详情 / 系统日志 |
+
+- 📖 **完整 Docker 部署教程**（compose / docker run / 升级备份 / 权限排障）：[README-Docker.md](README-Docker.md)
+- 📋 API 契约：[docs/SPEC.md](docs/SPEC.md) · [docs/SPEC-v2.md](docs/SPEC-v2.md)
+- ⚙️ CI：镜像构建 [docker.yml](.github/workflows/docker.yml)（`docker-v*` 标签 → GHCR，不构建桌面客户端）· 测试门禁 [ci.yml](.github/workflows/ci.yml)（仅 server/web 路径）
