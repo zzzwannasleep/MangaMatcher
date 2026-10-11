@@ -92,7 +92,7 @@ Vue 3 + Vite + 原生 CSS（design tokens），深色漫画审美、克制、动
 ```
 server/   Go 后端（backend agent 独占）
 web/      Vue 前端（frontend agent 独占）
-Dockerfile / docker-compose.yml / .github/workflows / README-Docker.md  （Lead 独占）
+Dockerfile / docker-compose.yml / .github/workflows / README.md  （Lead 独占）
 docs/SPEC.md  本文件
 tools/mock-komga.js / mock-bangumi.js  复用的 mock（端口 25699 / 25698）
 ```
