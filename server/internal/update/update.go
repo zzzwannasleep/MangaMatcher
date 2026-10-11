@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -63,7 +65,15 @@ type Checker struct {
 }
 
 // NewChecker 创建（repoAPI 默认仓库 tags API；测试注入 httptest URL）。
+// 环境变量 GITHUB_TAGS_API 可覆盖基址：本地用 tools/mock-github.js 离线自测更新链路。
+// 传完整 API URL 或裸 base 均可（裸 base 自动补 /repos/... 路径）。
 func NewChecker(repoAPI string, client *http.Client) *Checker {
+	if repoAPI == "" {
+		repoAPI = os.Getenv("GITHUB_TAGS_API")
+	}
+	if repoAPI != "" && !strings.Contains(repoAPI, "/repos/") {
+		repoAPI = strings.TrimRight(repoAPI, "/") + "/repos/zzzwannasleep/MangaMatcher/tags?per_page=100"
+	}
 	if repoAPI == "" {
 		repoAPI = "https://api.github.com/repos/zzzwannasleep/MangaMatcher/tags?per_page=100"
 	}

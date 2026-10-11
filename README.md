@@ -187,6 +187,9 @@ go test ./server/... -count=1
 ## 🛠 构建
 
 ```powershell
+# 本地一键构建（前端嵌入 + 版本注入，随功能更新重建，可本地自测在线更新链路）
+.\tools\build.ps1              # Docker 版 → bin\komgabangumi.exe；-Target desktop 出桌面版；详见 docs/DEVELOPMENT.md §6
+
 # 桌面版（Windows；macOS 由 CI 产出）
 dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
 

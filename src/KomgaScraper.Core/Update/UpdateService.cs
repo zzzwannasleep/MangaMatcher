@@ -36,7 +36,10 @@ public sealed partial class UpdateService
     [GeneratedRegex(@"^v\d+\.\d+")]
     private static partial Regex DesktopTagPrefixRe();
 
-    private const string RepoApi = "https://api.github.com/repos/zzzwannasleep/MangaMatcher/releases?per_page=30";
+    // GitHub Releases API 基址：环境变量 KOMGASCRAPE_RELEASES_API 可覆盖（本地用 tools/mock-github.js 离线自测检查链路）。
+    private static readonly string RepoApi =
+        Environment.GetEnvironmentVariable("KOMGASCRAPE_RELEASES_API")
+        ?? "https://api.github.com/repos/zzzwannasleep/MangaMatcher/releases?per_page=30";
     public const string RepoPage = "https://github.com/zzzwannasleep/MangaMatcher/releases";
 
     private readonly IAppLogger _log;

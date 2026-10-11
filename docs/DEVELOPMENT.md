@@ -12,6 +12,7 @@
 | `tools/mock-mox.js` | 25696 | Mox 站点模拟（含 520 退避场景） |
 | `tools/mock-mangadex.js` | 25695 | MangaDex API 模拟 |
 | `tools/mock-baike.js` | 25694 | 百度百科词条卡片模拟 |
+| `tools/mock-github.js` | 25693 | GitHub tags/releases/资产 zip 模拟（离线自测「检查更新」链路，见 §6） |
 
 ```powershell
 node tools/mock-komga.js
@@ -20,6 +21,7 @@ node tools/mock-ai.js
 node tools/mock-mox.js
 node tools/mock-mangadex.js
 node tools/mock-baike.js
+node tools/mock-github.js
 ```
 
 > mock-komga 首次启动会经代理拉取真实 Bangumi 数据建库，控制台出现 `[MOCK] library ready` 即就绪；代理不可用时自动降级为内置兜底数据。
@@ -68,3 +70,41 @@ web/src 改动 → node node_modules/vite/bin/vite.js build
 ```
 
 > 直接改前端跑 `npm run dev` 时代理到后端 8080，无需重嵌。
+
+## 6. 本地构建 + 在线更新自测
+
+本地构建随功能更新重建（前端产物嵌入 + 版本注入），一条命令：
+
+```powershell
+.\tools\build.ps1                          # Docker 版 → bin\komgabangumi.exe（默认 version=dev，检查更新不误报）
+.\tools\build.ps1 -SkipWeb                 # web/src 没改时跳过前端构建
+.\tools\build.ps1 -Run                     # 构建完直接启动（http://localhost:8080）
+.\tools\build.ps1 -Target desktop          # 桌面版 → bin\desktop-win-x64\（默认 version=最新 v* tag）
+.\tools\build.ps1 -Target all -Version 0.0.15
+```
+
+版本号决定更新检查的表现：`dev` / `0.0.0` 不提示；显式传更小的数字（如 `-Version 0.0.1`）→ 「发现新版本」；传更大的（如 `9.9.9`）→ 「已是最新」。
+
+### Docker/Web 版全链路（离线，走 mock）
+
+```powershell
+node tools/mock-github.js                                        # 假 GitHub：docker-v9.9.9 / v9.9.9 + 资产 zip
+$env:GITHUB_TAGS_API='http://127.0.0.1:25693'                    # 后端检查指向 mock（裸 base 自动补 /repos/... 路径）
+.\tools\build.ps1 -Version 0.0.1 -Run                            # 注入低版本并启动
+# Web 设置页 → 软件更新 → 立即检查 → 「发现新版本 v9.9.9」横幅 + compose pull 引导
+```
+
+改 `MOCK_LATEST_DOCKER` 控制返回的最新 tag；不设 `GITHUB_TAGS_API` 则请求真实 GitHub API。
+
+### 桌面版检查链路（离线，走 mock）
+
+```powershell
+node tools/mock-github.js
+$env:KOMGASCRAPE_RELEASES_API='http://127.0.0.1:25693'
+.\tools\build.ps1 -Target desktop -Version 0.0.15
+# 运行 bin\desktop-win-x64\KomgaScraper.exe → 设置 → 软件更新 → 检查更新 → 发现 v9.9.9
+```
+
+> ⚠ mock 资产 zip 只含标记文件（不是可运行程序）：走 mock 时只测「检查/提示」，别点「下载并安装」。
+> 桌面版**完整自更新**（下载 → 原地替换 → 重启）用真实 GitHub 测：`-Version 0.0.15`（低于线上最新 v0.0.16）
+> 构建后直接运行，检查更新 → 下载并安装 → 程序自动重启为 v0.0.16，数据目录不受影响。
