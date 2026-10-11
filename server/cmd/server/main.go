@@ -109,6 +109,7 @@ func main() {
 	am := auth.NewManager(secret)
 	server := api.NewServer(st, am, log)
 	server.SetDataDir(dataDir)
+	server.Start() // 库缓存：从 SQLite 恢复 + 自动对齐 Komga（间隔由设置驱动）
 
 	log.Info("KomgaBangumi 后端启动: http://0.0.0.0:" + port + "（数据目录 " + dataDir + "）")
 	if err := http.ListenAndServe(":"+port, server.Router()); err != nil {

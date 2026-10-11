@@ -100,7 +100,8 @@ func (s *Server) handleSettingsPatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "请求体格式错误")
 		return
 	}
-	st, err := s.LoadSettings().ApplyPatch(body)
+	old := s.LoadSettings()
+	st, err := old.ApplyPatch(body)
 	if err != nil {
 		writeError(w, 400, "设置格式错误: "+err.Error())
 		return
@@ -108,6 +109,16 @@ func (s *Server) handleSettingsPatch(w http.ResponseWriter, r *http.Request) {
 	if err := s.SaveSettings(st); err != nil {
 		writeError(w, 500, "保存设置失败")
 		return
+	}
+	// Komga 连接三要素变更 → 库缓存作废（避免串库）；缓存开关变化 → 同步刷新循环节奏
+	if old.KomgaURL != st.KomgaURL || old.KomgaAPIKey != st.KomgaAPIKey ||
+		old.KomgaUser != st.KomgaUser || old.KomgaPassword != st.KomgaPassword {
+		s.cache.Reset()
+		go func() {
+			if err := s.cache.RefreshAll(); err != nil {
+				s.log.Warn("Komga 连接变更后重建库缓存失败: " + err.Error())
+			}
+		}()
 	}
 	s.log.Info("管理员更新了全局设置")
 	writeJSON(w, 200, st.Masked())

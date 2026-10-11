@@ -16,6 +16,7 @@ import (
 	"komgabangumi/internal/bangumi"
 	"komgabangumi/internal/jobs"
 	"komgabangumi/internal/komga"
+	"komgabangumi/internal/komgacache"
 	"komgabangumi/internal/scrape"
 	"komgabangumi/internal/sources"
 	"komgabangumi/internal/store"
@@ -33,13 +34,56 @@ type Server struct {
 	log       *slog.Logger
 	komgaBase string // 测试注入：绕过设置的 Komga 客户端工厂（为空时按设置构建）
 	dataDir   string // BW 索引 / 日志 / 直写目录的基准
+	cache     *komgacache.Cache
 }
 
 // NewServer 创建 API 服务器（内部创建任务引擎，Runner 由最新设置构建）。
 func NewServer(st *store.Store, am *auth.Manager, log *slog.Logger) *Server {
 	s := &Server{store: st, auth: am, log: log, dataDir: "./data"}
 	s.jobs = jobs.NewEngine(s.komgaClient, log, s.newRunner)
+	s.cache = komgacache.New(st.DB(), s.komgaFactory, log)
+	s.jobs.OnDone = s.onJobDone
 	return s
+}
+
+// Start 启动库缓存自动刷新（main.go 在 SetDataDir 后调用；集成测试不调用 → 缓存走兜底）。
+func (s *Server) Start() {
+	s.cache.Start(s.cacheInterval)
+}
+
+// cacheInterval 缓存自动刷新间隔（设置热更新；<=0 = 关闭自动刷新）。
+func (s *Server) cacheInterval() time.Duration {
+	st := s.LoadSettings()
+	if !st.Cache.Enabled {
+		return 0
+	}
+	if st.Cache.RefreshMinutes <= 0 {
+		return 0
+	}
+	return time.Duration(st.Cache.RefreshMinutes) * time.Minute
+}
+
+// cacheEnabled 缓存开关（读路径门控）。
+func (s *Server) cacheEnabled() bool {
+	return s.LoadSettings().Cache.Enabled
+}
+
+// komgaFactory Komga 客户端工厂（缓存与 komgaClient 共用；测试注入 komgaBase 时同样生效）。
+func (s *Server) komgaFactory() *komga.Client { return s.komgaClient() }
+
+// onJobDone 任务完成 → 受影响系列回源刷新缓存（异步，不阻塞任务收尾）。
+func (s *Server) onJobDone(_ string, seriesIDs []string) {
+	for _, id := range seriesIDs {
+		s.cache.InvalidateSeries(id)
+	}
+}
+
+// coversDir 封面磁盘缓存目录（DATA_DIR/covers）。
+func (s *Server) coversDir() string { return filepath.Join(s.dataDir, "covers") }
+
+// coverPath 封面缓存文件路径（kind: series|book）。
+func (s *Server) coverPath(kind, id string) string {
+	return filepath.Join(s.coversDir(), kind+"-"+id+".bin")
 }
 
 // SetDataDir 设置数据目录（BW 索引 / 日志 / Mylar 基准；main.go 与测试注入）。
@@ -100,6 +144,10 @@ func (s *Server) Router() http.Handler {
 
 	// 日志（admin only）
 	authed.Handle("GET /api/logs", s.admin(s.handleLogs))
+
+	// 本地库缓存（admin only）
+	authed.Handle("GET /api/cache/status", s.admin(s.handleCacheStatus))
+	authed.Handle("POST /api/cache/refresh", s.admin(s.handleCacheRefresh))
 
 	mux.Handle("/api/", s.auth.Middleware(authed))
 
@@ -239,7 +287,7 @@ func (s *Server) newRunner(dryRun bool) *scrape.Runner {
 		Whitelist:        st.VersionTagWhitelist,
 		Blacklist:        st.VersionTagBlacklist,
 		CoverHTTP:        coverHTTP,
-		State:            &storeStateAdapter{st: s.store},
+		State:            &storeStateAdapter{st: s.store, s: s},
 	}
 }
 
@@ -280,10 +328,17 @@ func (s *Server) bwIndexPath() string {
 }
 
 // storeStateAdapter store 刮削状态 → scrape.StateWriter 适配。
-type storeStateAdapter struct{ st *store.Store }
+type storeStateAdapter struct {
+	st *store.Store
+	s  *Server // 封面缓存失效需要（与 store 同生命周期）
+}
 
-// SetCover 记封面状态。
+// SetCover 记封面状态（封面刚被任务写入 → 同步失效封面磁盘缓存 + 系列缓存回源）。
 func (a *storeStateAdapter) SetCover(seriesID string, ok bool) {
+	if ok {
+		a.s.dropCover("series", seriesID)
+		a.s.cache.InvalidateSeries(seriesID)
+	}
 	existing, _ := a.st.GetScrapeState(seriesID)
 	st := store.ScrapeState{SeriesID: seriesID, HasCover: ok}
 	if existing != nil {

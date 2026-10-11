@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 # MangaMatcher
 
@@ -69,6 +69,7 @@ docker compose up -d
 | 🏷 **版本标记** | 爱藏版/完全版等后缀自动落标签，黑白名单可自定义，多版本系列不再刮平（MACHINE 标签可追溯） |
 | 📦 **Mylar 导出** | `series.json` 导出（相对目录结构 + oneshot 特殊名 + 可选封面），Docker 版另支持直写 comicsDir |
 | 🌐 **代理** | HTTP/HTTPS/SOCKS4/4a/5 + 账密，Bangumi/封面/BookWalker 共用；Komga 永远直连 |
+| ⚡ **本地缓存** | 库数据存本地双层缓存（内存 + SQLite/JSON）：打开即出列表不重拉全库，后台定时对齐 Komga 增量，封面磁盘缓存 + 304，两种形态都有 |
 
 **形态特有**：桌面版 Dry-run 逐字段预览先行、绿色便携不写注册表；Docker 版 Web 封面卡片墙（懒加载扛千卷大库）、任务逐系列差异详情（用了哪个源/匹配到谁/改了哪些字段）、系统日志页在线导出、多用户分权。
 

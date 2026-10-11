@@ -51,27 +51,64 @@ func (s *Server) handleLibrarySeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	client := s.komgaClient()
-	data, err := client.ListSeriesPaged(libID, page, size)
-	if err != nil {
-		writeError(w, 502, "获取库内系列失败: "+err.Error())
-		return
-	}
-	// filter/q 过滤（对当前页内容做内存筛选；status/状态判定不在此处发额外请求）
-	if filter != "" || q != "" {
-		var kept []komga.SeriesDto
-		for _, series := range data.Content {
-			if q != "" && !matchSeriesQuery(series, q) {
-				continue
+	var data *komga.Page[komga.SeriesDto]
+	// 缓存启用且已就绪 → 内存筛选+裁剪（零 Komga 请求）；否则直连 Komga（兼容旧路径/测试）
+	if s.cacheEnabled() && s.cache.Ready() {
+		all := s.cache.SeriesInLib(libID)
+		if q != "" {
+			var kept []komga.SeriesDto
+			for _, series := range all {
+				if matchSeriesQuery(series, q) {
+					kept = append(kept, series)
+				}
 			}
-			if filter != "" && filter != "all" && !s.stateMatches(series, filter) {
-				continue
-			}
-			kept = append(kept, series)
+			all = kept
 		}
-		data.Content = kept
-		data.TotalElements = int64(len(kept))
-		data.NumberOfElements = len(kept)
+		if filter != "" && filter != "all" {
+			var kept []komga.SeriesDto
+			for _, series := range all {
+				if s.stateMatches(series, filter) {
+					kept = append(kept, series)
+				}
+			}
+			all = kept
+		}
+		start, size0 := page*size, size
+		if start > len(all) {
+			start = len(all)
+		}
+		end := start + size0
+		if end > len(all) {
+			end = len(all)
+		}
+		data = &komga.Page[komga.SeriesDto]{
+			Content: all[start:end], TotalElements: int64(len(all)),
+			NumberOfElements: end - start,
+		}
+	} else {
+		client := s.komgaClient()
+		var err error
+		data, err = client.ListSeriesPaged(libID, page, size)
+		if err != nil {
+			writeError(w, 502, "获取库内系列失败: "+err.Error())
+			return
+		}
+		// filter/q 过滤（对当前页内容做内存筛选；status/状态判定不在此处发额外请求）
+		if filter != "" || q != "" {
+			var kept []komga.SeriesDto
+			for _, series := range data.Content {
+				if q != "" && !matchSeriesQuery(series, q) {
+					continue
+				}
+				if filter != "" && filter != "all" && !s.stateMatches(series, filter) {
+					continue
+				}
+				kept = append(kept, series)
+			}
+			data.Content = kept
+			data.TotalElements = int64(len(kept))
+			data.NumberOfElements = len(kept)
+		}
 	}
 	if data.Content == nil {
 		data.Content = []komga.SeriesDto{}
@@ -159,12 +196,6 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, []any{})
 		return
 	}
-	client := s.komgaClient()
-	libs, err := client.GetLibraries()
-	if err != nil {
-		writeError(w, 502, "获取库列表失败: "+err.Error())
-		return
-	}
 	type searchItem struct {
 		ID          string               `json:"id"`
 		Name        string               `json:"name"`
@@ -175,26 +206,59 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		State       map[string]any       `json:"state,omitempty"`
 	}
 	var out []searchItem
-	for _, lib := range libs {
-		if c.Role != "admin" && !s.canAccessLibrary(c, lib.ID) {
-			continue
+	// 缓存启用且就绪 → 内存检索（零 Komga 请求）
+	if s.cacheEnabled() && s.cache.Ready() {
+		libs := s.cache.Libraries()
+		libNames := map[string]string{}
+		for _, l := range libs {
+			libNames[l.ID] = l.Name
 		}
-		data, err := client.ListSeriesPaged(lib.ID, 0, 2000)
-		if err != nil {
-			continue
-		}
-		for _, series := range data.Content {
-			if !matchSeriesQuery(series, q) {
+		for _, lib := range libs {
+			if c.Role != "admin" && !s.canAccessLibrary(c, lib.ID) {
 				continue
 			}
-			out = append(out, searchItem{ID: series.ID, Name: series.Name, LibraryID: lib.ID,
-				LibraryName: lib.Name, BooksCount: series.BooksCount, Metadata: series.Metadata})
+			for _, series := range s.cache.SeriesInLib(lib.ID) {
+				if !matchSeriesQuery(series, q) {
+					continue
+				}
+				out = append(out, searchItem{ID: series.ID, Name: series.Name, LibraryID: lib.ID,
+					LibraryName: libNames[lib.ID], BooksCount: series.BooksCount, Metadata: series.Metadata})
+				if len(out) >= size {
+					break
+				}
+			}
 			if len(out) >= size {
 				break
 			}
 		}
-		if len(out) >= size {
-			break
+	} else {
+		client := s.komgaClient()
+		libs, err := client.GetLibraries()
+		if err != nil {
+			writeError(w, 502, "获取库列表失败: "+err.Error())
+			return
+		}
+		for _, lib := range libs {
+			if c.Role != "admin" && !s.canAccessLibrary(c, lib.ID) {
+				continue
+			}
+			data, err := client.ListSeriesPaged(lib.ID, 0, 2000)
+			if err != nil {
+				continue
+			}
+			for _, series := range data.Content {
+				if !matchSeriesQuery(series, q) {
+					continue
+				}
+				out = append(out, searchItem{ID: series.ID, Name: series.Name, LibraryID: lib.ID,
+					LibraryName: lib.Name, BooksCount: series.BooksCount, Metadata: series.Metadata})
+				if len(out) >= size {
+					break
+				}
+			}
+			if len(out) >= size {
+				break
+			}
 		}
 	}
 	if out == nil {
@@ -210,10 +274,20 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	c := auth.FromContext(r.Context())
 	id := r.PathValue("id")
 	client := s.komgaClient()
-	series, err := client.GetSeries(id)
-	if err != nil {
-		writeError(w, statusOf(err), "获取系列失败: "+err.Error())
-		return
+	// 缓存命中 → 系列详情零请求；书籍列表仍直连（详情页低频）
+	var series *komga.SeriesDto
+	if s.cacheEnabled() {
+		if cs, ok := s.cache.GetSeries(id); ok {
+			series = cs
+		}
+	}
+	if series == nil {
+		got, err := client.GetSeries(id)
+		if err != nil {
+			writeError(w, statusOf(err), "获取系列失败: "+err.Error())
+			return
+		}
+		series = got
 	}
 	if !s.canAccessLibrary(c, series.LibraryID) {
 		writeError(w, 403, "没有该库的访问权限")
@@ -269,6 +343,7 @@ func (s *Server) handleSeriesMetadataRaw(w http.ResponseWriter, r *http.Request)
 		writeError(w, statusOf(err), "更新系列元数据失败: "+err.Error())
 		return
 	}
+	s.cache.InvalidateSeries(id) // 缓存单系列回源（元数据已变）
 	s.log.Info("编辑器更新系列元数据 " + series.Name + "（字段: " + strings.Join(patchKeys(patch), ",") + "）")
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
@@ -391,6 +466,13 @@ func (s *Server) handleCoverCommon(w http.ResponseWriter, r *http.Request, isSer
 	if err != nil {
 		writeError(w, statusOf(err), "上传封面失败: "+err.Error())
 		return
+	}
+	// 缓存失效：封面磁盘缓存删除 + 系列数据回源（booksCount/updatedAt 等可能变化）
+	if isSeries {
+		s.dropCover("series", id)
+		s.cache.InvalidateSeries(id)
+	} else {
+		s.dropCover("book", id)
 	}
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
@@ -1143,6 +1225,38 @@ func (s *Server) todayLogPath() string {
 // contextWithTimeout 包装（30 分钟上限）。
 func contextWithTimeout(d time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), d)
+}
+
+// ---------- 10. 本地库缓存 ----------
+
+// handleCacheStatus GET /api/cache/status → 缓存概况（设置页「本地缓存」卡片）。
+func (s *Server) handleCacheStatus(w http.ResponseWriter, r *http.Request) {
+	st := s.LoadSettings()
+	last := s.cache.LastSyncAt()
+	writeJSON(w, 200, map[string]any{
+		"enabled":       st.Cache.Enabled,
+		"refreshMinutes": st.Cache.RefreshMinutes,
+		"ready":         s.cache.Ready(),
+		"refreshing":    s.cache.IsRefreshing(),
+		"seriesCount":   s.cache.SeriesCount(),
+		"libraryCount":  s.cache.LibraryCount(),
+		"lastSync":      last,
+		"ageMinutes":    int(time.Since(last).Minutes()),
+	})
+}
+
+// handleCacheRefresh POST /api/cache/refresh → 立即全量对齐（异步执行，立即返回状态）。
+func (s *Server) handleCacheRefresh(w http.ResponseWriter, r *http.Request) {
+	if s.cache.IsRefreshing() {
+		writeJSON(w, 200, map[string]any{"ok": true, "already": true})
+		return
+	}
+	go func() {
+		if err := s.cache.RefreshAll(); err != nil {
+			s.log.Warn("手动刷新库缓存失败: " + err.Error())
+		}
+	}()
+	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
 // ---------- 源客户端构建（候选/详情端点共用） ----------

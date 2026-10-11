@@ -169,6 +169,156 @@ public sealed partial class MainWindow
             }
             catch { /* 降级映射兜底 */ }
         });
+
+        InitLibraryCache();
+    }
+
+    // ================= 本地库缓存（打开即用 + 自动对齐） =================
+
+    /// <summary>初始化/复用库缓存；Komga 连接信息变更时自动清空重建。</summary>
+    private void InitLibraryCache()
+    {
+        if (!_settings.CacheEnabled)
+        {
+            _libCacheTimer?.Stop();
+            _libCache = null;
+            return;
+        }
+        _libCache ??= new LibraryCache(AppSettings.LibraryCacheFile);
+        if (_libCache.EnsureConnection(_settings))
+            Log("INFO", "Komga 连接信息已变更，本地库缓存已清空（将在下次对齐时重建）");
+        RestartCacheTimer();
+    }
+
+    private void SetupCacheTimer()
+    {
+        _libCacheTimer = new DispatcherTimer();
+        _libCacheTimer.Tick += async (_, _) => await AutoCacheRefreshAsync();
+    }
+
+    private void RestartCacheTimer()
+    {
+        if (_libCacheTimer == null) return;
+        if (!_settings.CacheEnabled || _settings.CacheRefreshMinutes <= 0)
+        {
+            _libCacheTimer.Stop();
+            return;
+        }
+        _libCacheTimer.Stop();
+        _libCacheTimer.Interval = TimeSpan.FromMinutes(Math.Clamp(_settings.CacheRefreshMinutes, 1, 10080));
+        _libCacheTimer.Start();
+    }
+
+    /// <summary>启动恢复：缓存有数据 → 库列表 + 上次使用的库直接秒出（零 Komga 请求），随后后台对齐。</summary>
+    private void RestoreCacheView()
+    {
+        if (_libCache == null || !_libCache.Ready) return;
+        var libs = _libCache.Libraries;
+        if (libs.Count == 0) return;
+        FillLibraryCombo(libs);
+
+        var libId = _settings.LastLibraryId;
+        if (libId.Length > 0 && _libCache.HasLibrary(libId))
+        {
+            var cached = _libCache.SeriesInLibrary(libId) ?? [];
+            _seriesCache.Clear();
+            _rows.Clear();
+            foreach (var s in cached)
+            {
+                _seriesCache[s.Id] = s;
+                _rows.Add(new SeriesRow(s, () => CoverCell(s.Id)));
+            }
+            var libName = libs.FirstOrDefault(l => l.Id == libId)?.Name ?? libId;
+            StatusText.Text = $"库 \"{libName}\"：{cached.Count} 个系列（本地缓存，{CacheAgeText()}）";
+            Log("INFO", $"已从本地缓存恢复 {cached.Count} 个系列（快照 {CacheAgeText()}）——后台自动对齐中…");
+            StartCoverSweep(cached);
+        }
+        else
+        {
+            Log("INFO", $"已从本地缓存恢复 {libs.Count} 个库（快照 {CacheAgeText()}）");
+        }
+        _ = AutoCacheRefreshAsync();   // 打开软件即静默对齐一次
+    }
+
+    private string CacheAgeText()
+    {
+        var t = _libCache?.LastSync ?? default;
+        if (t == default) return "未知时间";
+        var span = DateTime.Now - t;
+        if (span.TotalMinutes < 1) return "刚刚";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes} 分钟前";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours} 小时前";
+        return $"{(int)span.TotalDays} 天前";
+    }
+
+    /// <summary>定时/启动触发的静默全量对齐；完成后当前视图从缓存重建（勾选保留）。</summary>
+    private async Task AutoCacheRefreshAsync()
+    {
+        if (_libCache == null || _komga == null || _busy) return;
+        if (!_settings.CacheEnabled || _settings.CacheRefreshMinutes <= 0) { _libCacheTimer?.Stop(); return; }
+        try
+        {
+            var (total, changed, removed) = await _libCache.RefreshAllAsync(_komga, null, CancellationToken.None);
+            Log("INFO", $"库缓存自动对齐完成：{total} 系列（新增/变更 {changed}，移除 {removed}）");
+            RefreshViewFromCache();
+        }
+        catch (OperationCanceledException) { /* 忽略 */ }
+        catch (Exception e)
+        {
+            Log("WARN", $"库缓存自动对齐失败: {e.Message}（继续使用本地缓存数据）");
+        }
+    }
+
+    /// <summary>对齐完成后：当前显示的库从缓存重建行（勾选状态保留）。</summary>
+    private void RefreshViewFromCache()
+    {
+        var libId = _settings.LastLibraryId;
+        if (libId.Length == 0 || _libCache?.HasLibrary(libId) != true) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_busy) return;   // 任务运行中的行刷新由任务收尾负责
+            var cached = _libCache!.SeriesInLibrary(libId);
+            if (cached == null) return;
+            ReplaceRowsWith(cached);
+            var libName = _libCache.Libraries.FirstOrDefault(l => l.Id == libId)?.Name ?? libId;
+            StatusText.Text = $"库 \"{libName}\"：{cached.Count} 个系列（已对齐）";
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>用给定系列集合重建行：勾选状态按 id 保留（复用 ApplyFilter 的重建模式）。</summary>
+    private void ReplaceRowsWith(List<SeriesDto> series)
+    {
+        var checkedIds = new HashSet<string>(_rows.Where(r => r.Checked).Select(r => r.Series.Id));
+        _seriesCache.Clear();
+        _rows.Clear();
+        foreach (var s in series)
+        {
+            _seriesCache[s.Id] = s;
+            _rows.Add(new SeriesRow(s, () => CoverCell(s.Id)) { Checked = checkedIds.Contains(s.Id) });
+        }
+        UpdateEmptyHint();
+    }
+
+    /// <summary>「加载系列」命中缓存 → 秒出，后台静默对齐单库。</summary>
+    private async Task SilentRefreshLibraryAsync(LibraryDto library)
+    {
+        try
+        {
+            var (total, changed) = await _libCache!.RefreshLibraryAsync(_komga!, library.Id, null, CancellationToken.None);
+            Log("INFO", $"后台对齐完成：库 \"{library.Name}\" {total} 系列（新增/变更 {changed}）");
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_busy) return;
+                var cached = _libCache!.SeriesInLibrary(library.Id);
+                if (cached == null || _settings.LastLibraryId != library.Id) return;
+                ReplaceRowsWith(cached);
+                StatusText.Text = $"库 \"{library.Name}\"：{cached.Count} 个系列（已对齐）";
+            }, DispatcherPriority.Background);
+        }
+        catch (Exception e)
+        {
+            Log("WARN", $"后台对齐失败: {e.Message}（显示的是本地缓存数据）");
+        }
     }
 
     private async Task TestConnectionAsync()
@@ -184,6 +334,7 @@ public sealed partial class MainWindow
             _cts = new CancellationTokenSource();
             var libs = await Task.Run(() => _komga!.GetLibrariesAsync(_cts.Token));
             FillLibraryCombo(libs);
+            _libCache?.SetLibraries(libs, LibraryCache.ConnKeyOf(_settings));
             StatusText.Text = $"连接成功，共 {libs.Count} 个库";
             Log("INFO", $"连接成功：{_settings.KomgaUrl}，共 {libs.Count} 个库");
         }
@@ -242,6 +393,21 @@ public sealed partial class MainWindow
         }
 
         var library = _libraries[CmbLibrary.SelectedIndex];
+
+        // 本地缓存命中 → 系列列表秒出（零 Komga 请求），后台静默对齐单库
+        if (_settings.CacheEnabled && _libCache?.HasLibrary(library.Id) == true)
+        {
+            var cachedNow = _libCache.SeriesInLibrary(library.Id) ?? [];
+            ReplaceRowsWith(cachedNow);
+            _settings.LastLibraryId = library.Id;
+            SaveSettings();
+            StatusText.Text = $"库 \"{library.Name}\"：{cachedNow.Count} 个系列（本地缓存，{CacheAgeText()}）";
+            Log("INFO", $"「加载系列」命中本地缓存：{cachedNow.Count} 个系列秒出（快照 {CacheAgeText()}），后台静默对齐 Komga…");
+            StartCoverSweep(cachedNow);
+            _ = SilentRefreshLibraryAsync(library);
+            return;
+        }
+
         try
         {
             var series = await RunBusyAsync(ct => _komga!.ListSeriesInLibraryAsync(library.Id, ct));
@@ -254,6 +420,7 @@ public sealed partial class MainWindow
             }
             _settings.LastLibraryId = library.Id;
             SaveSettings();
+            _libCache?.ReplaceLibrary(library.Id, series, LibraryCache.ConnKeyOf(_settings));
             StatusText.Text = $"库 \"{library.Name}\"：{series.Count} 个系列";
             Log("INFO", $"已加载库 \"{library.Name}\" 的 {series.Count} 个系列");
             if (_komga!.LastSeriesTotalElements > 0 && _komga.LastSeriesTotalElements != series.Count)
@@ -353,6 +520,7 @@ public sealed partial class MainWindow
             {
                 var s = await _komga!.GetSeriesAsync(id, _cts?.Token ?? CancellationToken.None);
                 _seriesCache[id] = s;
+                _libCache?.UpdateSeries(s);   // 写入后缓存即时回源（下次打开也是新数据）
                 if (_state?.GetCover(id) == null)
                 {
                     var has = await SeriesHasUserCoverAsync(id, _cts?.Token ?? CancellationToken.None);

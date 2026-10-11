@@ -53,6 +53,7 @@ type Engine struct {
 	log          *slog.Logger
 	komgaFactory func() *komga.Client              // 按最新设置构建 Komga 客户端
 	newRunner    func(dryRun bool) *scrape.Runner // 由 api 层注入（含最新设置）
+	OnDone       func(jobID string, seriesIDs []string) // 任务结束钩子（缓存回源等；api 层注入）
 }
 
 // NewEngine 创建引擎。
@@ -244,9 +245,18 @@ func (e *Engine) finish(ctx context.Context, job *Job) {
 			job.Status = "done"
 		}
 	}
+	ids := make([]string, 0, len(job.Items))
+	for _, it := range job.Items {
+		if it.SeriesID != "" && it.SeriesID != it.Message {
+			ids = append(ids, it.SeriesID)
+		}
+	}
 	e.mu.Unlock()
 	e.log.Info("任务 " + job.ID + " 结束：status=" + job.Status +
 		" ok=" + itoa(job.OK) + " failed=" + itoa(job.Failed))
+	if e.OnDone != nil {
+		e.OnDone(job.ID, ids)
+	}
 }
 
 func boolStr(b bool) string {

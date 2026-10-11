@@ -61,6 +61,11 @@ public sealed class AppSettings
     /// <summary>界面主题："light" / "dark"（状态栏月亮/太阳按钮切换，重启保留）。</summary>
     [JsonPropertyName("theme")] public string Theme { get; set; } = "light";
 
+    /// <summary>本地库缓存：打开软件即出库数据，不重复拉全库；后台按间隔自动对齐 Komga。</summary>
+    [JsonPropertyName("cacheEnabled")] public bool CacheEnabled { get; set; } = true;
+    /// <summary>库缓存自动对齐间隔（分钟，0=关闭自动对齐；元数据写入后总会即时回源）。</summary>
+    [JsonPropertyName("cacheRefreshMinutes")] public int CacheRefreshMinutes { get; set; } = 60;
+
     /// <summary>标记白名单：文件夹名后缀命中即保留为标签（内置词表认不出的也能按用户口径落）。</summary>
     [JsonPropertyName("tagWhitelist")] public List<string> TagWhitelist { get; set; } = [];
     /// <summary>标记黑名单：命中的后缀不落标签，标题里残留的旧后缀也会被清掉。</summary>
@@ -79,6 +84,9 @@ public sealed class AppSettings
 
     /// <summary>BookWalker 索引路径（由应用从 sqlite 构建）。</summary>
     public static string BkwkIndexPath => Path.Combine(DataDir, "bkwk-index.json.gz");
+
+    /// <summary>库缓存路径（Komga 库/系列数据快照，打开软件即用）。</summary>
+    public static string LibraryCacheFile => Path.Combine(DataDir, "library-cache.json");
 
     /// <summary>最近一次读写失败原因（成功时为 null）——用于把"静默失败"变成界面上可见的错误。</summary>
     public static string? LastError { get; private set; }

@@ -32,6 +32,12 @@ type BookWalkerSettings struct {
 	WriteExtras bool   `json:"writeExtras"` // 类型/题材/出版品牌/阅读方向 写入 Komga
 }
 
+// CacheSettings 本地库缓存配置（打开即用不重拉；后台自动对齐 Komga）。
+type CacheSettings struct {
+	Enabled        bool `json:"enabled"`
+	RefreshMinutes int  `json:"refreshMinutes"` // 自动对齐间隔（分钟；0=关闭自动刷新）
+}
+
 // Settings 全局设置（SPEC-v2 第 1 节 + v1 已有字段）。
 // 秘钥字段 GET 返回 "****" 打码；PATCH 传 "****" 或空表示不修改。
 type Settings struct {
@@ -59,6 +65,7 @@ type Settings struct {
 	VersionTagWhitelist []string           `json:"versionTagWhitelist"`
 	VersionTagBlacklist []string           `json:"versionTagBlacklist"`
 	ComicsDir           string             `json:"comicsDir"`
+	Cache               CacheSettings      `json:"cache"`
 
 	// 内部：DATA_DIR（不进 JSON）
 	DataDir string `json:"-"`
@@ -79,6 +86,7 @@ func (s *Server) LoadSettings() Settings {
 		MatchType:            "漫画",
 		BaikeEnabled:         true,
 		MangaDexEnabled:      true,
+		Cache:                CacheSettings{Enabled: true, RefreshMinutes: 60},
 		BookWalker: BookWalkerSettings{
 			DownloadURL: "https://data.bookwalker.com/bkwk-db.sqlite.zst",
 			WriteExtras: true,
@@ -142,6 +150,13 @@ func (s *Server) LoadSettings() Settings {
 			st.VersionTagWhitelist = saved.VersionTagWhitelist
 			st.VersionTagBlacklist = saved.VersionTagBlacklist
 			st.ComicsDir = saved.ComicsDir
+			// 缓存：老设置无该字段 → 保持默认（开 + 60min）
+			if rawHasKeyAny(v, "cache") {
+				st.Cache.Enabled = saved.Cache.Enabled
+				if saved.Cache.RefreshMinutes >= 0 {
+					st.Cache.RefreshMinutes = saved.Cache.RefreshMinutes
+				}
+			}
 		}
 	} else {
 		// 尚无整体设置 blob：回退读取 main.go 的 env 种子（SeedSettingIfAbsent 写入的独立键）。
@@ -373,6 +388,21 @@ func (st Settings) ApplyPatch(body json.RawMessage) (Settings, error) {
 	}
 	if v, ok := getStr("comicsDir"); ok {
 		cp.ComicsDir = v
+	}
+	if raw, ok := patch["cache"]; ok {
+		var cm map[string]any
+		if json.Unmarshal(raw, &cm) == nil {
+			if b, ok := cm["enabled"].(bool); ok {
+				cp.Cache.Enabled = b
+			}
+			if f, ok := cm["refreshMinutes"].(float64); ok && f >= 0 {
+				n := int(f)
+				if n > 1440 {
+					n = 1440
+				}
+				cp.Cache.RefreshMinutes = n
+			}
+		}
 	}
 	return cp, nil
 }

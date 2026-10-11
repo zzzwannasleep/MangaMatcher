@@ -37,6 +37,7 @@ const form = reactive({
   versionTagWhitelistText: '',
   versionTagBlacklistText: '',
   comicsDir: '',
+  cache: { enabled: true, refreshMinutes: 60 },
 })
 
 // 后端对密钥打码返回 "****"：输入框留空 = 不修改
@@ -95,12 +96,16 @@ async function load() {
     form.versionTagWhitelistText = (data.versionTagWhitelist || []).join('\n')
     form.versionTagBlacklistText = (data.versionTagBlacklist || []).join('\n')
     form.comicsDir = data.comicsDir || ''
+    const cache = data.cache || {}
+    form.cache.enabled = cache.enabled !== false
+    form.cache.refreshMinutes = cache.refreshMinutes ?? 60
 
     komgaKeyMasked.value = !!data.komgaApiKey
     bangumiMasked.value = !!data.bangumiToken
     aiKeyMasked.value = !!ai.apiKey
     proxyPasswordMasked.value = !!proxy.password
     refreshBwStatus()
+    refreshCacheStatus()
   } catch (err) {
     loadError.value = err.message
     notify.error(err.message)
@@ -114,6 +119,17 @@ function linesToArray(text) {
     .split('\n')
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+function cacheAgeText(lastSync) {
+  const ms = Date.now() - new Date(lastSync).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return ''
+  const min = Math.floor(ms / 60000)
+  if (min < 1) return '刚刚'
+  if (min < 60) return `${min} 分钟前`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `${h} 小时前`
+  return `${Math.floor(h / 24)} 天前`
 }
 
 function validate() {
@@ -177,6 +193,10 @@ async function save() {
       versionTagWhitelist: linesToArray(form.versionTagWhitelistText),
       versionTagBlacklist: linesToArray(form.versionTagBlacklistText),
       comicsDir: form.comicsDir.trim(),
+      cache: {
+        enabled: form.cache.enabled,
+        refreshMinutes: Number(form.cache.refreshMinutes) || 0,
+      },
     }
     await api('/api/settings', { method: 'PATCH', body: patch })
     notify.success('设置已保存')
@@ -271,9 +291,52 @@ async function bwImport(event) {
   }
 }
 
+/* ---------- 本地库缓存 ---------- */
+const cacheStatus = ref(null) // { enabled, refreshMinutes, ready, refreshing, seriesCount, libraryCount, lastSync, ageMinutes }
+const cacheRefreshing = ref(false)
+let cacheTimer = null
+
+async function refreshCacheStatus() {
+  try {
+    cacheStatus.value = await api('/api/cache/status')
+  } catch {
+    /* 状态拿不到不阻塞设置页 */
+  }
+}
+
+async function cacheRefreshNow() {
+  cacheRefreshing.value = true
+  try {
+    await api('/api/cache/refresh', { method: 'POST', body: {} })
+    notify.info('库缓存对齐已开始（后台执行，可稍后查看状态）')
+    // 轮询至 refreshing 结束
+    stopCachePoll()
+    cacheTimer = setInterval(async () => {
+      await refreshCacheStatus()
+      if (!cacheStatus.value?.refreshing) {
+        stopCachePoll()
+        notify.success(`库缓存已对齐（${cacheStatus.value?.seriesCount ?? 0} 系列）`)
+      }
+    }, 2000)
+  } catch (err) {
+    notify.error(err.message)
+    cacheRefreshing.value = false
+  }
+}
+
+function stopCachePoll() {
+  if (cacheTimer) {
+    clearInterval(cacheTimer)
+    cacheTimer = null
+  }
+}
+
 onMounted(load)
 
-onBeforeUnmount(stopBwPoll)
+onBeforeUnmount(() => {
+  stopBwPoll()
+  stopCachePoll()
+})
 </script>
 
 <template>
@@ -420,6 +483,50 @@ onBeforeUnmount(stopBwPoll)
             <small>刮削失败的系列自动加入 Komga 收藏夹，便于人工处理</small>
           </span>
         </label>
+      </section>
+
+      <section class="card card-pad section">
+        <h2 class="section-title">本地缓存</h2>
+
+        <label class="toggle-row">
+          <input type="checkbox" v-model="form.cache.enabled" />
+          <span>
+            <strong>启用库数据缓存</strong>
+            <small>库/系列数据存本地（内存 + SQLite），打开页面即出数据，不再每次重新连接拉全库</small>
+          </span>
+        </label>
+
+        <div class="field field-inline">
+          <label class="field-label" for="s-cache-refresh">自动对齐间隔</label>
+          <select id="s-cache-refresh" v-model.number="form.cache.refreshMinutes" class="select select-mid" :disabled="!form.cache.enabled">
+            <option :value="0">不自动对齐</option>
+            <option :value="10">每 10 分钟</option>
+            <option :value="30">每 30 分钟</option>
+            <option :value="60">每 1 小时</option>
+            <option :value="180">每 3 小时</option>
+            <option :value="360">每 6 小时</option>
+            <option :value="1440">每天一次</option>
+          </select>
+          <span class="field-hint">后台增量对齐 Komga；编辑器/刮削任务的变更会即时回源，无需等待</span>
+        </div>
+
+        <div v-if="cacheStatus" class="cache-status">
+          <span class="cache-pill" :data-on="cacheStatus.ready">{{ cacheStatus.ready ? '已就绪' : '未预热' }}</span>
+          <span class="cache-meta">{{ cacheStatus.libraryCount }} 库 · {{ cacheStatus.seriesCount }} 系列</span>
+          <span v-if="cacheStatus.lastSync" class="cache-meta">
+            上次对齐 {{ cacheAgeText(cacheStatus.lastSync) }}
+          </span>
+          <button
+            class="btn btn-sm"
+            type="button"
+            :disabled="cacheStatus.refreshing"
+            @click="cacheRefreshNow"
+          >
+            <span v-if="cacheStatus.refreshing" class="spinner" aria-hidden="true"></span>
+            {{ cacheStatus.refreshing ? '对齐中…' : '立即对齐' }}
+          </button>
+        </div>
+        <p class="field-hint">Komga 地址或密钥变更时缓存会自动清空重建，不会出现串库数据。</p>
       </section>
 
       <section class="card card-pad section">
@@ -683,6 +790,38 @@ onBeforeUnmount(stopBwPoll)
 .test-result[data-ok='false'] {
   color: var(--err);
 }
+
+.cache-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-m);
+  background: var(--bg-inset);
+}
+
+.cache-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line-1);
+  color: var(--text-2);
+}
+
+.cache-pill[data-on='true'] {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+
+.cache-meta {
+  font-size: 12.5px;
+  color: var(--text-1);
+}
+
 
 .field-inline {
   flex-direction: row;

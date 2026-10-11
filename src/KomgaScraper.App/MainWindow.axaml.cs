@@ -40,6 +40,8 @@ public sealed partial class MainWindow : Window
     private BaikeClient? _baike;
     private MangaDexClient? _mdex;
     private ScrapeStateStore? _state;
+    private LibraryCache? _libCache;
+    private DispatcherTimer? _libCacheTimer;
 
     private List<LibraryDto> _libraries = [];
     private readonly Dictionary<string, SeriesDto> _seriesCache = new();
@@ -95,12 +97,16 @@ public sealed partial class MainWindow : Window
         LoadSettingsToUi();
         ApplyTheme(_settings.Theme == "dark", persist: false);
         RebuildClients();
+        SetupCacheTimer();
 
         // 首次运行：立刻生成一份默认 settings.json，用户能看到设置文件的确切位置
         if (!File.Exists(AppSettings.SettingsFile)) SaveSettings();
         Log("INFO", $"就绪。设置文件: {AppSettings.SettingsFile}");
         if (AppSettings.LastError != null) Log("ERR ", AppSettings.LastError);
         Log(_settings.DryRun ? "WARN" : "INFO", DryRunText);
+
+        // 本地库缓存：打开即用（不重新连接拉全库），后台自动对齐
+        RestoreCacheView();
     }
 
     private string DryRunText => _settings.DryRun

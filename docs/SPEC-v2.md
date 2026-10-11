@@ -123,6 +123,15 @@ Bangumi精确 → BookWalker索引 → AI识别(拿不到时问AI作品名 jp/cn
 - slog 双写：stdout + `DATA_DIR/logs/log-YYYYMMDD.log`
 - `GET /api/logs?lines=500` → `text/plain` 最近日志（admin only）
 
+## 9b. 本地库缓存（打开即用 + 自动对齐）
+
+- 双层：内存（读路径零 Komga 请求）+ SQLite（`cache_series` / `cache_libraries` 表，重启恢复）；封面单独磁盘缓存 `DATA_DIR/covers/` + ETag/304
+- 设置：`cache.enabled`（默认 true）+ `cache.refreshMinutes`（默认 60，0=关闭自动对齐）
+- `GET /api/cache/status` → `{enabled, refreshMinutes, ready, refreshing, seriesCount, libraryCount, lastSync, ageMinutes}`（admin only）
+- `POST /api/cache/refresh` → 立即全量对齐（异步，`{ok, already?}`）（admin only）
+- 失效链：编辑器 PATCH 元数据 → 单系列回源；封面上传 → 删封面缓存 + 回源；任务完成 → 逐系列回源（jobs OnDone 钩子）；Komga 连接三要素变更 → 缓存清空重建（防串库）
+- 桌面版同语义：`data/library-cache.json` + 设置 cacheEnabled/cacheRefreshMinutes（设置 → 本地缓存）；启动恢复上次库视图，加载系列命中缓存秒出 + 后台单库对齐
+
 ## 10. Mock（node，tools/，浏览器联调用；Go httptest 版在 server 测试内）
 
 - `mock-ai.js` :25697 — OpenAI 兼容 `/v1/chat/completions`，按 prompt 关键词返回罐头 JSON（识别/选择/翻译/补写）

@@ -52,6 +52,9 @@ func Open(dataDir string) (*Store, error) {
 // Close 关闭数据库。
 func (s *Store) Close() error { return s.db.Close() }
 
+// DB 底层连接（缓存子系统共用同一连接池：modernc sqlite 单写者，勿另开连接）。
+func (s *Store) DB() *sql.DB { return s.db }
+
 func (s *Store) migrate() error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS users (
@@ -76,6 +79,17 @@ func (s *Store) migrate() error {
 			has_summary INT NOT NULL DEFAULT 0,
 			links TEXT,
 			checked_at TEXT
+		)`,
+		// Komga 库缓存（komgacache 双层缓存的持久层）：data = 完整 DTO JSON
+		`CREATE TABLE IF NOT EXISTS cache_series (
+			series_id TEXT PRIMARY KEY,
+			library_id TEXT NOT NULL,
+			data TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_cache_series_lib ON cache_series(library_id)`,
+		`CREATE TABLE IF NOT EXISTS cache_libraries (
+			id TEXT PRIMARY KEY,
+			data TEXT NOT NULL
 		)`,
 	}
 	for _, q := range stmts {

@@ -46,6 +46,8 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox _chkMangaDex = new() { Content = "启用（英文圈图源，百科兜底之前；走代理）" };
     private readonly CheckBox _chkJapaneseOnly = new() { Content = "只匹配日漫（韩漫/美漫/国漫候选一律剔除）" };
     private readonly CheckBox _chkKomgaProxy = new() { Content = "Komga 连接走代理（本机/内网部署保持关闭）" };
+    private readonly CheckBox _chkCacheEnabled = new() { Content = "启用本地库缓存（打开软件即出数据，不重复拉全库）" };
+    private readonly NumericUpDown _numCacheRefresh = new() { Minimum = 0, Maximum = 10080, Value = 60, Width = 110 };
     private readonly TextBox _txtTagWhitelist = new() { AcceptsReturn = true, Height = 56, TextWrapping = TextWrapping.Wrap };
     private readonly TextBox _txtTagBlacklist = new() { AcceptsReturn = true, Height = 56, TextWrapping = TextWrapping.Wrap };
 
@@ -88,6 +90,8 @@ public sealed class SettingsWindow : Window
         _chkMangaDex.IsChecked = current.MangaDexEnabled;
         _chkJapaneseOnly.IsChecked = current.JapaneseOnly;
         _chkKomgaProxy.IsChecked = current.KomgaProxyEnabled;
+        _chkCacheEnabled.IsChecked = current.CacheEnabled;
+        _numCacheRefresh.Value = Math.Clamp(current.CacheRefreshMinutes, 0, 10080);
         _numConcurrency.Value = Math.Clamp(current.ScrapeConcurrency, 1, 8);
         _cmbMatchType.SelectedItem = current.MatchType;
         _txtTagWhitelist.Text = string.Join("\r\n", current.TagWhitelist);
@@ -264,6 +268,22 @@ public sealed class SettingsWindow : Window
         Ui.BindTheme(concHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
         concRow.Children.Add(concHint);
         Field("批量并发", concRow);
+
+        Section("本地缓存");
+        Field("库缓存", _chkCacheEnabled);
+        var cacheRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+        cacheRow.Children.Add(_numCacheRefresh);
+        var cacheHint = new TextBlock
+        {
+            Text = "分钟自动对齐（0 = 不自动，写入后仍即时回源）",
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12,
+        };
+        Ui.BindTheme(cacheHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        cacheRow.Children.Add(cacheHint);
+        Field("自动对齐", cacheRow);
+        Hint("库/系列数据存 data\\library-cache.json：打开软件直接出列表，后台静默对齐 Komga。\r\n" +
+             "元数据/封面写入后立即回源缓存；Komga 地址或密钥变更时缓存自动清空重建。");
 
         Section("版本标记（黑白名单）");
         Field("白名单", _txtTagWhitelist);
@@ -469,5 +489,7 @@ public sealed class SettingsWindow : Window
         MangaDexEnabled = _chkMangaDex.IsChecked == true,
         JapaneseOnly = _chkJapaneseOnly.IsChecked == true,
         KomgaProxyEnabled = _chkKomgaProxy.IsChecked == true,
+        CacheEnabled = _chkCacheEnabled.IsChecked == true,
+        CacheRefreshMinutes = (int)_numCacheRefresh.Value,
     };
 }
