@@ -1,0 +1,247 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="KomgaScraper.App.SeriesEditorWindow"
+        Title="编辑单部漫画"
+        Width="1080" Height="780" MinWidth="900" MinHeight="640"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Microsoft YaHei UI, PingFang SC, Segoe UI"
+        Background="{DynamicResource AppBgBrush}">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <TabControl Grid.Row="0" Margin="10,10,10,0">
+
+            <!-- ================= 页签 1：系列信息 ================= -->
+            <TabItem Header="系列信息">
+                <Grid ColumnDefinitions="260,*" Margin="12,10,12,12">
+
+                    <!-- 左：封面卡片 -->
+                    <Border Grid.Column="0" Classes="group" Margin="0,0,12,0">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="groupTitle" Text="封面" />
+                            <Border Height="330" Background="{DynamicResource PlaceholderBgBrush}"
+                                    BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                                    CornerRadius="6" ClipToBounds="True">
+                                <Image x:Name="PicSeriesCover" Stretch="Uniform" />
+                            </Border>
+                            <Button x:Name="BtnPickSeriesCover" Content="选图更换封面…" Classes="app"
+                                    MinHeight="30" HorizontalAlignment="Stretch" />
+                            <Button x:Name="BtnResetSeriesCover" Content="恢复服务器封面" Classes="app"
+                                    MinHeight="28" HorizontalAlignment="Stretch" />
+                            <Button x:Name="BtnRetryCover" Content="重试封面（网络失败时点我）" Classes="app"
+                                    MinHeight="28" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 右：表单（标签在输入框上方，两列呼吸布局） -->
+                    <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="7" Margin="2,0,6,0">
+
+                            <Grid ColumnDefinitions="*,14,*">
+                                <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="标题" />
+                                    <TextBox x:Name="TxtTitle" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="排序标题" />
+                                    <TextBox x:Name="TxtTitleSort" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,14,*">
+                                <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="状态" />
+                                    <ComboBox x:Name="CmbStatus" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="阅读方向" />
+                                    <ComboBox x:Name="CmbDirection" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,14,*">
+                                <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="出版社" />
+                                    <TextBox x:Name="TxtPublisher" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="语言" />
+                                    <TextBox x:Name="TxtLanguage" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,14,*">
+                                <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="发售日期" />
+                                    <TextBox x:Name="TxtReleaseDate" Watermark="YYYY-MM-DD" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="总卷数" />
+                                    <TextBox x:Name="TxtTotalBooks" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="分级" />
+                                <TextBox x:Name="TxtAgeRating" Watermark="空=无分级；18=成人" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="简介" />
+                                <TextBox x:Name="TxtSummary" MinHeight="160" AcceptsReturn="True"
+                                         TextWrapping="Wrap" VerticalContentAlignment="Top"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                            </StackPanel>
+
+                            <TextBlock Text="清空文本框并保存 = 清空该字段" FontSize="11"
+                                       Foreground="{DynamicResource TextTertiaryBrush}" Margin="1,2,0,4" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+
+            <!-- ================= 页签 2：标签 / 作者 / 别名 ================= -->
+            <TabItem Header="标签 / 作者 / 别名">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" Margin="12,10,12,12">
+                    <StackPanel Spacing="7">
+
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="fieldLabel" Text="标签" />
+                            <TextBox x:Name="TxtTags" Watermark="逗号分隔，例：战斗,恋爱,MACHINE" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="fieldLabel" Text="题材" />
+                            <TextBox x:Name="TxtGenres" Watermark="逗号分隔，例：喜剧,幻想" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="fieldLabel" Text="作者" />
+                            <TextBox x:Name="TxtAuthors" Height="72" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     Watermark="每行一个：名字 或 名字(writer)" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="fieldLabel" Text="别名" />
+                            <TextBox x:Name="TxtAltTitles" Height="72" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     Watermark="每行一个：标题 或 标题|标签" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="fieldLabel" Text="来源链接" />
+                            <TextBox x:Name="TxtLinks" Height="72" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     Watermark="每行一个：标签|URL，如 Btv|https://…" />
+                        </StackPanel>
+
+                        <TextBlock Text="MACHINE 标签保存时自动补，无需手写。" FontSize="11"
+                                   Foreground="{DynamicResource TextTertiaryBrush}" Margin="1,4,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================= 页签 3：每卷 ================= -->
+            <TabItem Header="每卷">
+                <Grid RowDefinitions="Auto,*,250" Margin="12,10,12,12">
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                        <Button x:Name="BtnRescrapeVolumes" Content="重刮每卷（按卷号对齐）" Classes="app"
+                                MinHeight="30" />
+                        <TextBlock Text="遵循主界面 Dry-run 开关" FontSize="11.5"
+                                   Foreground="{DynamicResource TextTertiaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <DataGrid x:Name="BooksGrid" Grid.Row="1"
+                              AutoGenerateColumns="False" CanUserResizeColumns="True"
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource GridLinesBrush}"
+                              HeadersVisibility="Column" SelectionMode="Single"
+                              Background="{DynamicResource CardBgBrush}" RowBackground="Transparent"
+                              BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}" CornerRadius="6">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="卷号" Binding="{Binding Number}" Width="60" IsReadOnly="True" />
+                            <DataGridTextColumn Header="标题" Binding="{Binding Title}" Width="230" IsReadOnly="True" />
+                            <DataGridTextColumn Header="发售日" Binding="{Binding ReleaseDate}" Width="100" IsReadOnly="True" />
+                            <DataGridTextColumn Header="ISBN" Binding="{Binding Isbn}" Width="130" IsReadOnly="True" />
+                            <DataGridTemplateColumn Header="封面" Width="90" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Image Width="60" Height="84" Stretch="Uniform" Margin="2,3"
+                                               Source="{Binding ThumbImage}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="简介" Binding="{Binding SummaryBrief}" Width="*" IsReadOnly="True" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- 选中卷：左封面 + 右字段 -->
+                    <Grid Grid.Row="2" ColumnDefinitions="210,*" Margin="0,10,0,0">
+
+                        <Border Grid.Column="0" Classes="group" Margin="0,0,12,0">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="groupTitle" Text="卷封面" />
+                                <Border Height="170" Background="{DynamicResource PlaceholderBgBrush}"
+                                        BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                                        CornerRadius="6" ClipToBounds="True">
+                                    <Image x:Name="PicBookCover" Stretch="Uniform" />
+                                </Border>
+                                <Button x:Name="BtnPickBookCover" Content="选图换卷封面…" Classes="app"
+                                        MinHeight="28" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Spacing="6">
+                            <Grid ColumnDefinitions="*,14,*">
+                                <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="标题" />
+                                    <TextBox x:Name="TxtBookTitle" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="卷号" />
+                                    <TextBox x:Name="TxtBookNumber" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,14,*">
+                                <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="发售日" />
+                                    <TextBox x:Name="TxtBookDate" Watermark="YYYY-MM-DD" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="ISBN" />
+                                    <TextBox x:Name="TxtBookIsbn" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="简介" />
+                                <TextBox x:Name="TxtBookSummary" MinHeight="58" AcceptsReturn="True"
+                                         TextWrapping="Wrap" VerticalContentAlignment="Top"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                            </StackPanel>
+
+                            <Button x:Name="BtnSaveBook" Content="保存该卷" Classes="primary"
+                                    MinHeight="30" MinWidth="120" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- ================= 底部操作条 ================= -->
+        <Border Grid.Row="1" Background="{DynamicResource StatusBarBgBrush}"
+                BorderBrush="{DynamicResource StatusBarBorderBrush}" BorderThickness="0,1,0,0"
+                Padding="12,8" Margin="0,10,0,0">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                <Button x:Name="BtnClose" Content="关闭" Classes="app" MinHeight="32" MinWidth="88" />
+                <Button x:Name="BtnSaveSeries" Grid.Column="1" Content="保存系列信息" Classes="primary"
+                        MinHeight="32" MinWidth="120" Margin="10,0,0,0" />
+                <TextBlock x:Name="StatusText" Grid.Column="3" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" MaxWidth="620" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
