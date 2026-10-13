@@ -66,6 +66,8 @@ if ($Target -in 'docker', 'all') {
     Step "Go 构建（version=$dockerVersion）"
     Push-Location "$root\server"
     foreach ($k in $goEnv.Keys) { Set-Item -Path "env:$k" -Value $goEnv[$k] }
+    $env:GOTMPDIR = "$root\.toolchain\tmp"   # 系统 Temp 可能被安全软件/策略拒绝，用仓库内 tmp
+    New-Item -ItemType Directory -Force -Path $env:GOTMPDIR | Out-Null
     & $go build -trimpath -ldflags "-s -w -X main.version=$dockerVersion" -o "$root\bin\komgabangumi.exe" ./cmd/server
     $code = $LASTEXITCODE
     Pop-Location

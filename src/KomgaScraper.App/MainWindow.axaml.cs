@@ -243,16 +243,20 @@ public sealed partial class MainWindow : Window
             return;
         }
         if (!pt.Properties.IsLeftButtonPressed) return;
-        // 只在行上启用框选拦截：列头（含列宽拖块）与滚动条绝不抢捕获——
-        // 否则 DataGrid 原生拖拽失去鼠标捕获，列宽调节会退化成"点一下-滑动-再点一下"
+        // 只在行上启用框选：列头（含列宽拖块）、滚动条、复选框一概不碰——
+        // 复选框点击必须走原生按压/释放流程：mac 的输入后端对"事件路由途中改写
+        // 指针捕获"与 Win32 不一致，按下即捕获会让释放事件到不了 CheckBox，
+        // 表现为 mac 上点选框完全无效（Windows 下 CheckBox 自己重新捕获才侥幸可用）
         var src = e.Source as Visual;
         while (src is not null && src is not DataGridRow
-               && src is not Avalonia.Controls.Primitives.ScrollBar)
+               && src is not Avalonia.Controls.Primitives.ScrollBar
+               && src is not CheckBox)
             src = src.Parent as Visual;
         if (src is not DataGridRow) return;
         _bandMaybe = true;
         _bandStart = pt.Position;
-        e.Pointer.Capture(SeriesGrid);   // 统一捕获：拖出列表边界也能继续收 moved/released
+        // 按下时绝不捕获指针：普通点击原样交回原生控件；
+        // 拖动超过阈值确认是框选后才懒捕获（见 OnSeriesPointerMoved）
     }
 
     private void OnSeriesPointerMoved(object? sender, PointerEventArgs e)
@@ -264,7 +268,13 @@ public sealed partial class MainWindow : Window
         if (!_bandActive &&
             Math.Abs(pos.X - _bandStart.X) + Math.Abs(pos.Y - _bandStart.Y) < 6) return;   // 普通点击不动它
 
-        if (!_bandActive) _bandActive = true;
+        if (!_bandActive)
+        {
+            _bandActive = true;
+            // 拖动确认后才捕获：拖出列表边界也能继续收 moved/released；
+            // 此时按点不在复选框上（按压源已过滤），不影响原生点击
+            e.Pointer.Capture(SeriesGrid);
+        }
         DrawBandRect(_bandStart, pos);
         SelectSeriesByBand(_bandStart, pos);
     }
