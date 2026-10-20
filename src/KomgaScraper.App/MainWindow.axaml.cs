@@ -243,6 +243,12 @@ public sealed partial class MainWindow : Window
             return;
         }
         if (!pt.Properties.IsLeftButtonPressed) return;
+
+        // 勾选列（首列）：左键单击 = 立刻翻转勾选，不再依赖 CheckBox 自己收到指针事件。
+        // DataGrid 的单元格会把内容区的按压吃掉（内容只做"整行选中"），所以以前点方框只灰选、勾不上；
+        // 这里在隧道阶段（早于单元格）接管并置 Handled，顺带不再让整行被选中——点框就是点框。
+        if (TryToggleCheckColumn(e)) { e.Handled = true; return; }
+
         // 只在行上启用框选：列头（含列宽拖块）、滚动条、复选框一概不碰——
         // 复选框点击必须走原生按压/释放流程：mac 的输入后端对"事件路由途中改写
         // 指针捕获"与 Win32 不一致，按下即捕获会让释放事件到不了 CheckBox，
@@ -257,6 +263,22 @@ public sealed partial class MainWindow : Window
         _bandStart = pt.Position;
         // 按下时绝不捕获指针：普通点击原样交回原生控件；
         // 拖动超过阈值确认是框选后才懒捕获（见 OnSeriesPointerMoved）
+    }
+
+    /// <summary>
+    /// 命中勾选列（首列，固定 38px）时立即翻转该行勾选；返回 true = 已处理（调用方置 Handled 阻断 DataGrid 行选中）。
+    /// 行左边缘与首列左边缘对齐，所以相对行的 X 坐标落在首列宽度内即命中——不依赖 CheckBox 能否收到事件。
+    /// </summary>
+    private bool TryToggleCheckColumn(PointerPressedEventArgs e)
+    {
+        if (SeriesGrid.Columns.Count == 0) return false;
+        var el = e.Source as Visual;
+        while (el is not null && el is not DataGridRow) el = el.Parent as Visual;
+        if (el is not DataGridRow row || row.DataContext is not SeriesRow sr) return false;
+        if (e.GetPosition(row).X > SeriesGrid.Columns[0].ActualWidth) return false;
+        sr.Checked = !sr.Checked;
+        UpdateToggleAllLabel();
+        return true;
     }
 
     private void OnSeriesPointerMoved(object? sender, PointerEventArgs e)
@@ -654,7 +676,12 @@ public sealed partial class MainWindow : Window
 
     private bool GuardBusy()
     {
-        if (_busy) { _ = Ui.MessageAsync(this, "有任务正在执行，请等待或取消"); return false; }
+        if (_busy)
+        {
+            Log("WARN", "有任务正在执行，本次点击已忽略（可点「取消当前任务」后重试）");
+            _ = Ui.MessageAsync(this, "有任务正在执行，请等待或取消");
+            return false;
+        }
         if (_komga == null || _scrape == null || _batch == null || _mylar == null || _tagger == null)
         { _ = Ui.MessageAsync(this, "客户端未初始化", "错误", okOnly: true, error: true); return false; }
         return true;
@@ -745,7 +772,14 @@ public sealed partial class MainWindow : Window
         if (_rows.Count == 0) return;
         var target = !_rows.All(r => r.Checked);
         foreach (var r in _rows) r.Checked = target;
-        BtnToggleAll.Content = target ? "全不选" : "全选";
+        UpdateToggleAllLabel();
+    }
+
+    /// <summary>「全选 / 全不选」按钮文案跟随当前勾选状态（单行点选后也要跟上，否则按钮会撒谎）。</summary>
+    private void UpdateToggleAllLabel()
+    {
+        if (BtnToggleAll is null) return;
+        BtnToggleAll.Content = _rows.Count > 0 && _rows.All(r => r.Checked) ? "全不选" : "全选";
     }
 
     /// <summary>筛选（下拉模式 + 关键字）。重建可见行集合，勾选状态按 id 保留。</summary>
@@ -763,6 +797,7 @@ public sealed partial class MainWindow : Window
             var row = new SeriesRow(s, () => CoverCell(s.Id)) { Checked = checkedIds.Contains(s.Id) };
             _rows.Add(row);
         }
+        UpdateToggleAllLabel();
     }
 
     private static bool FilterRow(SeriesDto s, string kw, int mode)

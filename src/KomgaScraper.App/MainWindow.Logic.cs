@@ -334,11 +334,20 @@ public sealed partial class MainWindow
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(12));   // 等网络与代理就绪
-                _updateStatus = await _updater.CheckAsync(CancellationToken.None);
+                Log("INFO", "后台检查更新（GitHub Releases，与刮削互不影响）…");
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));   // 网络卡死也不许静默挂着
+                _updateStatus = await _updater.CheckAsync(timeout.Token);
                 if (_updateStatus.HasUpdate)
                     Log("INFO", $"有新版本可用：v{_updateStatus.Latest}（设置 → 软件更新 里一键升级）");
             }
-            catch { /* 检查失败静默（日志已记） */ }
+            catch (OperationCanceledException)
+            {
+                Log("WARN", "检查更新超时（不影响刮削，可到设置里手动重试）");
+            }
+            catch (Exception e)
+            {
+                Log("WARN", $"检查更新异常（不影响刮削）：{e.Message}");
+            }
         });
     }
 
@@ -605,12 +614,18 @@ public sealed partial class MainWindow
     {
         if (!GuardBusy()) return;
         var targets = GetCheckedSeries();
-        if (targets.Count == 0) { await Ui.MessageAsync(this, "请先勾选要刮削的系列", "提示", okOnly: true); return; }
+        if (targets.Count == 0)
+        {
+            // 没勾选就点按钮是最常见的"按钮失灵"投诉：日志里必须留痕，别让用户以为程序没反应
+            Log("WARN", $"未勾选任何系列，刮削未开始（当前列表 {_rows.Count} 行）。点列表首列复选框或「全选」后再试。");
+            await Ui.MessageAsync(this, "请先勾选要刮削的系列", "提示", okOnly: true);
+            return;
+        }
 
         // 全自动模式：走批量精确匹配管线（含 BookWalker/AI 回退），不弹候选框
         if (ChkAuto.IsChecked == true)
         {
-            await RunBatchMatchAsync(targets, "勾选系列");
+            await RunBatchMatchAsync(targets, "勾选系列", syncType);
             RefreshCheckedRows();
             return;
         }
@@ -622,9 +637,13 @@ public sealed partial class MainWindow
             "确认");
         if (!okGo) return;
         ClearPreview();
+        Log("INFO", $"开始刮削{label}：{targets.Count} 个系列（{(dry ? "Dry-run 预览" : "真实更新")}）…");
 
         _cts = new CancellationTokenSource();
+        // 手动逐部刮削也要进"忙"状态：否则「取消当前任务」一直是灰的，长列表根本中断不了
+        SetBusy(true);
         int done = 0, ok = 0;
+        var cancelled = false;
         foreach (var series in targets)
         {
             try
@@ -708,13 +727,22 @@ public sealed partial class MainWindow
                 var result = await ScrapeWithCandidateAsync(series, chosen, syncType, dry, done, targets.Count);
                 if (result.Success) ok++;
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException)
+            {
+                // 以前这里直接 throw：取消异常会冒到 UI 线程，而且取消按钮根本没被点亮过
+                Log("WARN", $"刮削已取消（已完成 {ok}/{targets.Count}）");
+                cancelled = true;
+                break;
+            }
             catch (Exception e)
             {
                 Log("ERR ", $"《{series.Name}》刮削异常: {e.Message}");
             }
         }
-        Log("INFO", $"刮削完成：{ok}/{targets.Count} 成功");
+        if (!cancelled) Log("INFO", $"刮削完成：{ok}/{targets.Count} 成功");
+        SetBusy(false);
+        _cts.Dispose();
+        _cts = null;
         RefreshCheckedRows();
         if (!dry && targets.Count <= 50)
             await RefreshRowsFromServerAsync(targets.Select(s => s.Id).ToList());
@@ -784,6 +812,7 @@ public sealed partial class MainWindow
             var clicked = _contextSeries;
             if (clicked == null)
             {
+                Log("WARN", $"未勾选任何系列，覆盖匹配未开始（当前列表 {_rows.Count} 行）。勾选或右键点在系列上后再试。");
                 await Ui.MessageAsync(this, "请先勾选要覆盖的系列，或右键点在要覆盖的系列上", "提示", okOnly: true);
                 return;
             }
@@ -798,6 +827,7 @@ public sealed partial class MainWindow
             "覆盖匹配");
         if (!okGo) return;
         ClearPreview();
+        Log("INFO", $"开始覆盖匹配：{targets.Count} 个系列（{(dry ? "Dry-run 预览" : "真实更新")}）…");
 
         _batch!.MatchTypePlatform = _settings.MatchType;
         _batch!.DryRun = dry;
@@ -828,6 +858,7 @@ public sealed partial class MainWindow
             var clicked = _contextSeries;
             if (clicked == null)
             {
+                Log("WARN", $"未勾选任何系列，纠正匹配未开始（当前列表 {_rows.Count} 行）。勾选或右键点在系列上后再试。");
                 await Ui.MessageAsync(this, "请先勾选系列，或右键点在要覆盖的系列上", "提示", okOnly: true);
                 return;
             }
@@ -842,6 +873,7 @@ public sealed partial class MainWindow
             "纠正匹配");
         if (!okGo) return;
         ClearPreview();
+        Log("INFO", $"开始纠正匹配：{targets.Count} 个系列（{(dry ? "Dry-run 预览" : "真实更新")}）…");
 
         SetBusy(true);
         _cts = new CancellationTokenSource();
@@ -982,6 +1014,7 @@ public sealed partial class MainWindow
             "刮削封面");
         if (!okGo) return;
         ClearPreview();
+        Log("INFO", $"开始刮削封面（{scope}）：{targets.Count} 个系列（{(dry ? "Dry-run 预览" : "真实更新")}）…");
 
         _batch!.MatchTypePlatform = _settings.MatchType;
         _batch!.DryRun = dry;
@@ -1001,22 +1034,26 @@ public sealed partial class MainWindow
         }
     }
 
-    private async Task RunBatchMatchAsync(List<SeriesDto> targets, string scope)
+    private async Task RunBatchMatchAsync(List<SeriesDto> targets, string scope, SyncType syncType)
     {
         var dry = ChkDryRun.IsChecked == true;
         var okGo = await Ui.MessageAsync(this,
             $"对{scope}共 {targets.Count} 个系列自动匹配刮削（Bangumi + 各源自动回退" +
             (_baike != null ? "，含百度百科" : "") + "）。\n" +
+            $"刮削范围：{(syncType == SyncType.All ? "元数据 + 封面" : "仅元数据")}\n" +
             $"模式：{(dry ? "Dry-run 预览" : "真实更新")}\n" +
             "已有 Btv 链接的跳过，失败的加入\"手动匹配\"收藏夹。\n继续？",
             "自动匹配刮削");
         if (!okGo) return;
         ClearPreview();
+        // 批量过程只在状态栏推进度、按系列才写日志；开头留一行，避免用户以为按钮没反应
+        Log("INFO", $"开始自动匹配刮削：{targets.Count} 个系列（{(dry ? "Dry-run 预览" : "真实更新")}，" +
+                    $"{(syncType == SyncType.All ? "元数据+封面" : "仅元数据")}）…");
 
         _batch!.MatchTypePlatform = _settings.MatchType;
         _batch!.DryRun = dry;
         var stats = await RunBusyAsync(ct => _batch!.BatchMatchAsync(targets,
-            SyncType.All, _settings.ForceRefreshBtv, ct));
+            syncType, _settings.ForceRefreshBtv, ct));
         Log("INFO", $"自动匹配刮削完成{(dry ? "（Dry-run 预览，未修改 Komga）" : "")}！{stats}");
         await Ui.InfoAsync(this, $"自动匹配完成{(dry ? "（Dry-run 预览）" : "")}：{stats}", "完成");
     }

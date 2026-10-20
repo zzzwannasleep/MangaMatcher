@@ -77,8 +77,12 @@ internal static class Ui
         panel.Children.Add(buttons);
         win.Content = panel;
 
-        if (owner is not null) return win.ShowDialog<bool>(owner);
-        win.Show();
+        // 结果只能走自己的 tcs：按钮里只调了 win.Close()，而 Avalonia 的 ShowDialog<T>
+        // 在没给对话框结果时会用 default(T) 兜底（Window.ShowCore 里 tcs.SetResult(_dialogResult ?? default)），
+        // 也就是"确定"永远被当成 false —— 所有确认框都会静默取消，按钮看起来完全失灵。
+        // 这里只用 ShowDialog 挡住主窗口（模态），返回值一律以 Closed 事件里的 okClicked 为准。
+        if (owner is not null) _ = win.ShowDialog(owner);
+        else win.Show();
         return tcs.Task;
     }
 
@@ -121,8 +125,10 @@ internal static class Ui
         panel.Children.Add(buttons);
         win.Content = panel;
 
-        if (owner is not null) return await win.ShowDialog<string?>(owner);
-        win.Show();
+        // 同上：ShowDialog<string?> 的返回值恒为 null（按钮只 Close() 不给结果），
+        // 会让"选择"永远等于取消。模态显示照旧，结果只认按钮写进 tcs 的值。
+        if (owner is not null) _ = win.ShowDialog(owner);
+        else win.Show();
         return await tcs.Task;
     }
 
