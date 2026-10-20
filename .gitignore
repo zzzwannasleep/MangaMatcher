@@ -1,7 +1,9 @@
-﻿# Build artifacts
+# Build artifacts
 bin/
 obj/
-dist/
+# 注意：写成 dist/ 会把整个目录排除，下面 webdist 的 .gitkeep 白名单就永远不生效
+# （git 不会进入被排除的目录）；必须排除「目录内容」才能再白名单具体文件。
+**/dist/*
 publish/
 out/
 

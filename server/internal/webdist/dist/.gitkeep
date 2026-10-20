@@ -1,0 +1,5 @@
+# 这个文件必须存在且必须入库：embed.go 的 `//go:embed all:dist` 要求 dist/ 目录非空。
+# 前端产物由 Docker 构建覆盖（Dockerfile: COPY --from=webbuild ... internal/webdist/dist），
+# 本地开发先跑 web/ 的 npm run build 再复制进来。若本文件缺失，干净检出上
+# `go vet ./...` / `go test ./...` 会直接失败：pattern all:dist: no matching files found
+# （CI 自 2026-10-11 起连续三次因为这个原因红）。
