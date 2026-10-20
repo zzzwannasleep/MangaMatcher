@@ -21,11 +21,12 @@ const SOURCE_META = {
   bookwalker: { label: 'BookWalker', bg: 'bw' },
   mox: { label: 'Mox', bg: 'mox' },
   mangadex: { label: 'MangaDex', bg: 'md' },
+  ehentai: { label: 'E-Hentai', bg: 'eh' },
   baike: { label: '百度百科', bg: 'bk' },
 }
 
 function sourceLabel(source) {
-  const map = { bangumi: 'Bangumi', bookwalker: 'BookWalker', mox: 'Mox', mangadex: 'MangaDex', baike: '百度百科', Bgm: 'Bangumi', Bw: 'BookWalker', Mox: 'Mox', MangaDex: 'MangaDex', Baike: '百度百科' }
+  const map = { bangumi: 'Bangumi', bookwalker: 'BookWalker', mox: 'Mox', mangadex: 'MangaDex', ehentai: 'E-Hentai', baike: '百度百科', Bgm: 'Bangumi', Bw: 'BookWalker', Mox: 'Mox', MangaDex: 'MangaDex', EH: 'E-Hentai', Baike: '百度百科' }
   return map[source] || source
 }
 
@@ -33,7 +34,7 @@ function sourceLabel(source) {
 const linkInput = ref('')
 const resolving = ref(false)
 const resolveError = ref('')
-const resolved = ref(null) // { source, id, title, oriTitle, author, aliases, summary, coverUrl }
+const resolved = ref(null) // { source, id, title, oriTitle, author, aliases, summary, coverUrl, tags, tagsRaw, url }
 
 const aliasTextOf = (d) => {
   const a = d?.aliases
@@ -41,6 +42,12 @@ const aliasTextOf = (d) => {
   if (Array.isArray(a)) return a.filter(Boolean).join('、')
   return String(a).split(' / ').filter(Boolean).join('、')
 }
+
+/* E-Hentai 中文标签（后端已按写库同源排序并截断 12 条，这里只做防御性兜底；其它源不返回） */
+const tagChips = (d) => (Array.isArray(d?.tags) ? d.tags : []).slice(0, 12)
+
+/* E-Hentai 原始英文标签（ns:tag），仅用于「查看原文标签」折叠 */
+const rawTags = (d) => (Array.isArray(d?.tagsRaw) ? d.tagsRaw : [])
 
 const resolvedAlias = computed(() => aliasTextOf(resolved.value))
 
@@ -120,6 +127,7 @@ function pickCandidate(cand) {
   loadDetail(cand.source || activeSource.value, cand.id)
 }
 
+// data: { source, id, title, oriTitle, author, aliases, summary, coverUrl, tags, tagsRaw, url }
 const detail = reactive({ loading: false, data: null, error: '' })
 
 async function loadDetail(source, id) {
@@ -195,7 +203,7 @@ onMounted(() => search())
             v-model="linkInput"
             class="input"
             type="text"
-            placeholder="粘贴 Bangumi 或百度百科链接（也支持纯 Bangumi ID）"
+            placeholder="粘贴 Bangumi / 百度百科 / E-Hentai 链接（也支持纯 Bangumi ID）"
             aria-label="来源链接"
             @keydown.enter.prevent="resolve"
           />
@@ -203,7 +211,7 @@ onMounted(() => search())
             {{ resolving ? '解析中…' : '解析' }}
           </button>
         </div>
-        <p class="cm-hint">支持 bgm.tv/subject/… · baike.baidu.com/item/… · 纯数字 Bangumi ID</p>
+        <p class="cm-hint">支持 bgm.tv/subject/… · baike.baidu.com/item/… · e-hentai.org/g/123456/abcdef/ · 纯数字 Bangumi ID</p>
 
         <div v-if="resolveError" class="cm-error" role="alert">
           <span>{{ resolveError }}</span>
@@ -230,6 +238,15 @@ onMounted(() => search())
             <p v-if="resolved.author" class="cm-preview-sub">作者：{{ resolved.author }}</p>
             <p v-if="resolvedAlias" class="cm-preview-sub">别名：{{ resolvedAlias }}</p>
             <p class="cm-preview-summary">{{ resolved.summary || '（无简介）' }}</p>
+
+            <!-- E-Hentai 中文标签（与写库同源，最多 12 条）+ 原文折叠 -->
+            <div v-if="tagChips(resolved).length" class="cm-tags">
+              <span v-for="(tag, i) in tagChips(resolved)" :key="`${i}-${tag}`" class="cm-tag">{{ tag }}</span>
+            </div>
+            <details v-if="rawTags(resolved).length" class="cm-tags-raw">
+              <summary>查看原文标签（{{ rawTags(resolved).length }}）</summary>
+              <p class="cm-tags-raw-line">{{ rawTags(resolved).join('、') }}</p>
+            </details>
             <p class="cm-preview-note">确认信息无误后写入该系列（旧匹配链接会被替换，卷级数据全部重抓）</p>
           </div>
         </div>
@@ -282,6 +299,7 @@ onMounted(() => search())
               class="cm-tab"
               :aria-selected="activeSource === source"
               :data-active="activeSource === source"
+              :data-bg="SOURCE_META[source]?.bg"
               @click="pickSource(source)"
             >
               {{ SOURCE_META[source]?.label || source }}
@@ -328,6 +346,15 @@ onMounted(() => search())
                 <p v-if="detail.data.author" class="cm-detail-sub">作者：{{ detail.data.author }}</p>
                 <p v-if="aliasTextOf(detail.data)" class="cm-detail-sub">别名：{{ aliasTextOf(detail.data) }}</p>
                 <p class="cm-detail-summary">{{ detail.data.summary || '（无简介）' }}</p>
+
+                <!-- E-Hentai 中文标签（与写库同源，最多 12 条）+ 原文折叠 -->
+                <div v-if="tagChips(detail.data).length" class="cm-tags">
+                  <span v-for="(tag, i) in tagChips(detail.data)" :key="`${i}-${tag}`" class="cm-tag">{{ tag }}</span>
+                </div>
+                <details v-if="rawTags(detail.data).length" class="cm-tags-raw">
+                  <summary>查看原文标签（{{ rawTags(detail.data).length }}）</summary>
+                  <p class="cm-tags-raw-line">{{ rawTags(detail.data).join('、') }}</p>
+                </details>
               </template>
 
               <EmptyState v-else icon="☞" title="选择一个候选" hint="查看大封面与完整简介" />
@@ -488,6 +515,13 @@ onMounted(() => search())
   border-color: transparent;
 }
 
+/* E-Hentai 徽章沿用其独立色相（info），与 Tab 一致 */
+.badge--source[data-source='ehentai'],
+.badge--source[data-source='EH'] {
+  color: var(--info);
+  background: var(--info-soft);
+}
+
 .cm-preview-title {
   margin: 2px 0 0;
   font-size: 16px;
@@ -559,6 +593,16 @@ onMounted(() => search())
 .cm-tab[data-active='true'] {
   color: var(--accent-strong);
   border-bottom-color: var(--accent);
+}
+
+/* E-Hentai 用独立色相，与其余源（accent 朱红）区分 */
+.cm-tab[data-bg='eh'] {
+  color: var(--info);
+}
+
+.cm-tab[data-bg='eh'][data-active='true'] {
+  color: var(--info);
+  border-bottom-color: var(--info);
 }
 
 .cm-tab-count {
@@ -708,6 +752,47 @@ onMounted(() => search())
   color: var(--text-1);
   line-height: 1.7;
   white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---- E-Hentai 标签：中文 chips + 原文折叠（候选详情 / 链接预览两处共用） ---- */
+.cm-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  margin-top: var(--s-2);
+}
+
+.cm-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: var(--info-soft);
+  color: var(--info);
+  font-size: 11.5px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.cm-tags-raw {
+  margin-top: var(--s-1);
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.cm-tags-raw > summary {
+  cursor: pointer;
+  color: var(--text-2);
+  width: fit-content;
+}
+
+.cm-tags-raw-line {
+  margin: var(--s-1) 0 0;
+  font-family: var(--font-mono);
+  color: var(--text-2);
+  line-height: 1.6;
   word-break: break-word;
 }
 

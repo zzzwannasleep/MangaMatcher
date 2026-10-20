@@ -6,9 +6,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"komgabangumi/internal/bangumi"
+	"komgabangumi/internal/ehtags"
 	"komgabangumi/internal/komga"
 	"komgabangumi/internal/sources"
 	"komgabangumi/internal/text"
@@ -35,18 +38,19 @@ func (s SlogLogger) Info(msg string) { s.L.Info(msg) }
 // Error 错误日志。
 func (s SlogLogger) Error(msg string) { s.L.Error(msg) }
 
-// SourceClients 五源客户端集合（nil = 该源未启用/未配置）。
+// SourceClients 六源客户端集合（nil = 该源未启用/未配置）。
 type SourceClients struct {
 	AI       *sources.AiClient
 	BW       *sources.BookWalkerIndex
 	Mox      *sources.MoxClient
 	MangaDex *sources.MangaDexClient
 	Baike    *sources.BaikeClient
+	EH       *sources.EhClient
 }
 
-// WithSources 注入五源客户端（链式配置）。
+// WithSources 注入六源客户端（链式配置）。
 func (s *Service) WithSources(sc SourceClients) *Service {
-	s.AI, s.BW, s.Mox, s.MangaDex, s.Baike = sc.AI, sc.BW, sc.Mox, sc.MangaDex, sc.Baike
+	s.AI, s.BW, s.Mox, s.MangaDex, s.Baike, s.EH = sc.AI, sc.BW, sc.Mox, sc.MangaDex, sc.Baike, sc.EH
 	return s
 }
 
@@ -145,6 +149,11 @@ func (s *Service) downloadImage(u string) ([]byte, error) {
 	if strings.Contains(strings.ToLower(u), "bookwalker") {
 		referer = "https://bookwalker.jp/" // BW CDN 按来源站校验
 	}
+	// EH 图床（ehgt.org）与画廊页同样按 Referer 校验，统一带表站地址
+	if lowU := strings.ToLower(u); strings.Contains(lowU, "ehgt.org") ||
+		strings.Contains(lowU, "e-hentai.org") || strings.Contains(lowU, "exhentai.org") {
+		referer = "https://e-hentai.org/"
+	}
 	if referer != "" {
 		req.Header.Set("Referer", referer)
 	}
@@ -184,7 +193,7 @@ func ClearedForReplace(src *komga.SeriesMetadataDto) *komga.SeriesMetadataDto {
 // IsSourceLink 是否旧匹配来源链接（纠正匹配时剔除，让新链接顶替；api 包也用）。
 func IsSourceLink(u string) bool {
 	lower := strings.ToLower(u)
-	for _, host := range []string{"bangumi.tv", "bgm.tv", "chii.in", "bookwalker", "bookof.moe", "kox.moe", "mangadex.org", "baike.baidu.com"} {
+	for _, host := range []string{"bangumi.tv", "bgm.tv", "chii.in", "bookwalker", "bookof.moe", "kox.moe", "mangadex.org", "baike.baidu.com", "e-hentai.org", "exhentai.org", "ehgt.org"} {
 		if strings.Contains(lower, host) {
 			return true
 		}
@@ -769,6 +778,279 @@ func (s *Service) scrapeFromMox(series *komga.SeriesDto, mox *sources.MoxSeries,
 
 	res.Success = true
 	res.MatchTitle = mox.Title
+	res.Changes = sink.items
+	return res
+}
+
+// EH 标签命名空间写入优先级（越靠前信息量越高；最多写 12 条）。
+var ehTagNSOrder = []string{"artist", "group", "parody", "character", "female", "male", "mixed", "other", "language", "category"}
+
+// splitEHRawTag EH 原始标签 "ns:tag" → (ns, tag)，ns 统一小写（无命名空间返回空）。
+func splitEHRawTag(raw string) (string, string) {
+	ns, tag, ok := strings.Cut(strings.TrimSpace(raw), ":")
+	if !ok {
+		return "", ""
+	}
+	return strings.ToLower(strings.TrimSpace(ns)), strings.TrimSpace(tag)
+}
+
+// EhTagLimit E-Hentai 标签写入上限（预览与写库共用，改这一处即可）。
+const EhTagLimit = 12
+
+// ehTagNames 按命名空间优先级把 "ns:tag" 转成 "中文命名空间:中文标签"（翻译未命中回落原始 tag 名）。
+func ehTagNames(rawTags []string, limit int) []string {
+	byNS := map[string][]string{}
+	for _, raw := range rawTags {
+		ns, tag := splitEHRawTag(raw)
+		if ns == "" || tag == "" {
+			continue
+		}
+		byNS[ns] = append(byNS[ns], tag)
+	}
+	out := make([]string, 0, limit)
+	for _, ns := range ehTagNSOrder {
+		for _, tag := range byNS[ns] {
+			if len(out) >= limit {
+				return out
+			}
+			name, ok := ehtags.Translate(ns, tag)
+			if !ok || strings.TrimSpace(name) == "" {
+				name = tag
+			}
+			out = append(out, ehtags.Label(ns)+":"+name)
+		}
+	}
+	return out
+}
+
+// EhDisplayTags 供 API 预览复用：与写库同源的「翻译 + 命名空间优先级 + 上限」标签列表。
+func EhDisplayTags(rawTags []string, limit int) []string { return ehTagNames(rawTags, limit) }
+
+// ehArtistAuthors artist/group 标签 → book 级作者（role=Artist；画师在前、社团在后，最多 6 个）。
+func ehArtistAuthors(rawTags []string) []komga.AuthorDto {
+	var out []komga.AuthorDto
+	seen := map[string]bool{}
+	for _, ns := range []string{"artist", "group"} {
+		for _, raw := range rawTags {
+			tns, tag := splitEHRawTag(raw)
+			if tns != ns || tag == "" {
+				continue
+			}
+			name, ok := ehtags.Translate(ns, tag)
+			if !ok || strings.TrimSpace(name) == "" {
+				name = tag
+			}
+			key := strings.ToLower(name)
+			if seen[key] || len(out) >= 6 {
+				continue
+			}
+			seen[key] = true
+			out = append(out, komga.AuthorDto{Name: name, Role: "Artist"})
+		}
+	}
+	return out
+}
+
+// ehLanguageCode language:xxx → ISO 码（只认四种常见语言）。
+func ehLanguageCode(rawTags []string) string {
+	for _, raw := range rawTags {
+		ns, tag := splitEHRawTag(raw)
+		if ns != "language" {
+			continue
+		}
+		switch strings.ToLower(tag) {
+		case "chinese":
+			return "zh"
+		case "japanese":
+			return "ja"
+		case "english":
+			return "en"
+		case "korean":
+			return "ko"
+		}
+	}
+	return ""
+}
+
+// ehPostedDate posted（unix 秒字符串）→ YYYY-MM-DD。
+func ehPostedDate(posted string) string {
+	sec, err := strconv.ParseInt(strings.TrimSpace(posted), 10, 64)
+	if err != nil || sec <= 0 {
+		return ""
+	}
+	return time.Unix(sec, 0).UTC().Format("2006-01-02")
+}
+
+// scrapeFromEH 用 E-Hentai 表站画廊数据刮削系列（一个画廊 = 一册；只补空缺，不覆盖用户已有数据）。
+// 与 scrapeFromMox 同构：读 komgaMeta → 组装 meta → Dry-run 出 diff / 真实模式 PATCH → sink.observe。
+func (s *Service) scrapeFromEH(series *komga.SeriesDto, g *sources.EhGallery, replace bool) *SeriesResult {
+	if s.EH == nil {
+		return &SeriesResult{Error: "E-Hentai 源未启用"}
+	}
+	seriesID := series.ID
+	seriesName := series.Name
+	if series.Metadata != nil && series.Metadata.Title != "" {
+		seriesName = series.Metadata.Title
+	}
+	res := &SeriesResult{}
+	sink := &changeSink{}
+	komgaMeta := series.Metadata
+	if replace && komgaMeta != nil {
+		komgaMeta = ClearedForReplace(komgaMeta)
+	}
+	s.Log.Info(fmt.Sprintf("刮削 《%s》 ← E-Hentai 《%s》%s", seriesName, g.Title, dryTag(s.DryRun)))
+
+	meta := &komga.SeriesMetadataDto{}
+	hasAny := false
+	linkAdded := false
+
+	// ---- 标题：当前为空或纠正匹配（replace 已由 ClearedForReplace 清空旧值）才写 ----
+	if (komgaMeta.GetTitle() == "" || replace) && strings.TrimSpace(g.Title) != "" {
+		if t := text.StripCopySuffix(strings.TrimSpace(g.Title)); t != "" {
+			meta.Title, meta.TitleSort = t, t
+			hasAny = true
+		}
+	}
+	// ---- 日文标题 → alternateTitles（原名；去重、空值跳过）----
+	if jpn := strings.TrimSpace(g.TitleJpn); jpn != "" && !komgaMeta.GetAlternateTitlesLock() {
+		merged := append([]komga.AlternateTitleDto{}, komgaMeta.AlternateTitles...)
+		seen := map[string]bool{}
+		for _, t := range merged {
+			seen[strings.ToLower(t.Title)] = true
+		}
+		if len([]rune(jpn)) <= 80 && !seen[strings.ToLower(jpn)] && !strings.EqualFold(jpn, g.Title) {
+			merged = append(merged, komga.AlternateTitleDto{Label: "原名", Title: text.Capitalize(jpn)})
+			meta.AlternateTitles = merged
+			hasAny = true
+		}
+	}
+	// ---- 发售日：posted（unix 秒）→ YYYY-MM-DD，仅旧值为空且未锁时写 ----
+	if komgaMeta.GetReleaseDate() == "" && !komgaMeta.GetReleaseDateLock() {
+		if d := ehPostedDate(g.Posted); d != "" {
+			meta.ReleaseDate = d
+			hasAny = true
+		}
+	}
+	// ---- 语言：language:chinese/japanese/english/korean → zh/ja/en/ko，仅旧值为空且未锁时写 ----
+	curLang := ""
+	if komgaMeta != nil {
+		curLang = komgaMeta.Language
+	}
+	langLocked := komgaMeta != nil && komgaMeta.LanguageLock != nil && *komgaMeta.LanguageLock
+	if curLang == "" && !langLocked {
+		if lang := ehLanguageCode(g.Tags); lang != "" {
+			meta.Language = lang
+			hasAny = true
+		}
+	}
+	// ---- 标签：命名空间优先级 + 中文翻译，最多 12 条（不含 MACHINE、不含库中已有）；tagsLock 时不写 ----
+	if !komgaMeta.GetTagsLock() {
+		tags := append([]string{}, komgaMeta.Tags...)
+		added := 0
+		for _, t := range ehTagNames(g.Tags, EhTagLimit) {
+			if added >= EhTagLimit {
+				break
+			}
+			if !containsFoldStr(tags, t) {
+				tags = append(tags, t)
+				added++
+			}
+		}
+		if added > 0 {
+			tags = dedup(tags)
+			if !containsStr(tags, text.MachineTag) {
+				tags = append(tags, text.MachineTag)
+			}
+			meta.Tags = tags
+			hasAny = true
+		}
+	}
+
+	s.applyScrapeMarksV2(meta, series, komgaMeta)
+
+	// ---- 链接：EH 画廊页（host 已存在则不重复加）----
+	links := append([]komga.LinkDto{}, komgaMeta.Links...)
+	hasEH := false
+	for _, l := range links {
+		low := strings.ToLower(l.URL)
+		if strings.Contains(low, "e-hentai.org") || strings.Contains(low, "exhentai.org") {
+			hasEH = true
+			break
+		}
+	}
+	if g.URL != "" && !hasEH {
+		links = append(links, komga.LinkDto{Label: "EH", URL: g.URL})
+		meta.Links = links
+		linkAdded = true
+	}
+
+	if !hasAny && !linkAdded {
+		s.Log.Info("《" + seriesName + "》E-Hentai 系列字段均已存在，无需更新")
+	} else if s.DryRun {
+		s.Log.Info("[Dry-run] PATCH /series/" + seriesID + "/metadata（E-Hentai）：" + summarizeMeta(meta))
+		sink.observe(Change{Kind: ChangeSeriesMeta, SeriesID: seriesID, Target: "《" + seriesName + "》",
+			Desc: "将更新系列元数据（E-Hentai）", Detail: summarizeMeta(meta), FieldDiff: diffSeriesMeta(komgaMeta, meta)})
+	} else {
+		if err := s.Komga.PatchSeriesMetadata(seriesID, meta); err != nil {
+			res.Error = "E-Hentai 系列元数据 PATCH 失败: " + err.Error()
+			s.Log.Error("《" + seriesName + "》E-Hentai 系列元数据 PATCH 失败: " + err.Error())
+			return res
+		}
+		s.Log.Info("《" + seriesName + "》系列信息已更新（E-Hentai）")
+		sink.observe(Change{Kind: ChangeSeriesMeta, SeriesID: seriesID, Target: "《" + seriesName + "》",
+			Desc: "已更新系列元数据（E-Hentai）", Detail: summarizeMeta(meta), FieldDiff: diffSeriesMeta(komgaMeta, meta)})
+	}
+	// EH 无简介字段 → 刻意不调 clearStaleSeries（否则会把旧简介当脏数据清掉）
+	if !s.DryRun {
+		s.removeManual(seriesID, seriesName)
+	}
+
+	// ---- 画师 / 社团 → book 级 Authors（series 级无 authors 字段；一册一个画廊，取该系列第一册）----
+	if authors := ehArtistAuthors(g.Tags); len(authors) > 0 {
+		books, err := s.Komga.ListBooksInSeries(seriesID)
+		if err != nil {
+			s.Log.Warn("《" + seriesName + "》E-Hentai 画师/社团写入失败（获取系列书籍失败）: " + err.Error())
+		} else if len(books) > 0 {
+			book := books[0]
+			volDisplay := pad2(orInt(text.ExtractBookVolumeNumber(book.Name, bookMetaTitle(book), bookMetaNumber(book)), 1))
+			hasAuthors := book.Metadata != nil && len(book.Metadata.Authors) > 0
+			authorsLocked := book.Metadata != nil && book.Metadata.AuthorsLock != nil && *book.Metadata.AuthorsLock
+			if !hasAuthors && !authorsLocked {
+				bookMeta := &komga.BookMetadataDto{Authors: authors}
+				diff := diffBookMeta(book.Metadata, bookMeta)
+				if s.DryRun {
+					sink.observe(Change{Kind: ChangeBookMeta, SeriesID: seriesID, BookID: book.ID,
+						Target: "《" + seriesName + "》卷 " + volDisplay, Desc: "将更新卷作者（E-Hentai）", FieldDiff: diff})
+				} else if err := s.Komga.PatchBookMetadata(book.ID, bookMeta); err != nil {
+					s.Log.Error("《" + seriesName + "》E-Hentai 卷作者写入失败: " + err.Error())
+				} else {
+					s.Log.Info("《" + seriesName + "》卷作者已更新（E-Hentai）")
+					sink.observe(Change{Kind: ChangeBookMeta, SeriesID: seriesID, BookID: book.ID,
+						Target: "《" + seriesName + "》卷 " + volDisplay, Desc: "已更新卷作者（E-Hentai）", FieldDiff: diff})
+				}
+			}
+		}
+	}
+
+	// ---- 封面：画廊缩略图（ehgt.org；Referer 走 downloadImage 的 EH 规则，413 由 updateSeriesCover 降级）----
+	if s.WithCovers {
+		cover := s.EH.CoverURL(g)
+		if s.DryRun {
+			if cover != "" {
+				s.Log.Info("[Dry-run] 将上传系列封面（E-Hentai）")
+			} else {
+				s.Log.Info("[Dry-run]《" + seriesName + "》E-Hentai 无封面，真实模式将清空旧封面")
+			}
+		} else if cover != "" {
+			s.updateSeriesCover(seriesID, seriesName, []string{cover}, sink)
+		} else {
+			s.clearSeriesCover(seriesID, seriesName)
+		}
+	}
+	s.ensureMachineTag(seriesID, seriesName, komgaMeta, meta)
+
+	res.Success = true
+	res.MatchTitle = g.Title
 	res.Changes = sink.items
 	return res
 }

@@ -235,9 +235,21 @@ func writeBWIndex(t *testing.T, dataDir string, entries []map[string]any) {
 	}
 }
 
-// restoreOverride 测试结束后恢复源基址（并行安全：本套件串行运行）。
+// stubEhSource 把 E-Hentai 源指向本地死端口：测试绝不允许出网（表站在墙内直连会等到超时）。
+// 连接被立刻拒绝，EH 分支在 1ms 内失败并继续走后续源。
+func stubEhSource(t *testing.T) {
+	t.Helper()
+	oldBase, oldPace := ehBaseOverride, ehPaceOverrideMs
+	ehBaseOverride, ehPaceOverrideMs = "http://127.0.0.1:1", 1
+	t.Cleanup(func() {
+		ehBaseOverride, ehPaceOverrideMs = oldBase, oldPace
+	})
+}
+
+// setSourceOverrides 测试结束后恢复源基址（并行安全：本套件串行运行）。
 func setSourceOverrides(t *testing.T, moxBase, mdBase, baikeBase string, moxPace int) {
 	t.Helper()
+	stubEhSource(t)
 	oldMox, oldMD, oldBaike, oldPace := moxBaseOverride, mangaDexBaseOverride, baikeBaseOverride, moxPaceOverrideMs
 	moxBaseOverride, mangaDexBaseOverride, baikeBaseOverride, moxPaceOverrideMs = moxBase, mdBase, baikeBase, moxPace
 	t.Cleanup(func() {

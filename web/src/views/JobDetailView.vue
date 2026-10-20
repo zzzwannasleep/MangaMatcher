@@ -21,12 +21,13 @@ const isDryRun = computed(() => !!job.value?.dryRun)
 
 const manualCount = computed(() => (job.value?.items || []).filter((i) => i.status === 'manual').length)
 
-/* 数据源标签（SeriesItem.source：Bgm|Bw|Mox|MangaDex|Baike|bangumi|bookwalker…） */
+/* 数据源标签（SeriesItem.source：Bgm|Bw|Mox|MangaDex|EH|Baike|bangumi|bookwalker…） */
 function sourceLabel(source) {
   const map = {
     Bgm: 'Bangumi', bangumi: 'Bangumi',
     Bw: 'BookWalker', bookwalker: 'BookWalker',
     Mox: 'Mox', mangadex: 'MangaDex', MangaDex: 'MangaDex',
+    ehentai: 'E-Hentai', EH: 'E-Hentai',
     Baike: '百度百科', baike: '百度百科',
   }
   return map[source] || source

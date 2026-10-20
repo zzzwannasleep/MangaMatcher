@@ -11,6 +11,13 @@ const FIELD_LABELS = {
   isbn: 'ISBN',
   name: '名称',
   titleSort: '排序标题',
+  genres: '类型',
+  links: '链接',
+  alternateTitles: '别名',
+  readingDirection: '阅读方向',
+  language: '语言',
+  publisher: '出版社',
+  ageRating: '年龄分级',
 }
 
 export function fieldLabel(key) {

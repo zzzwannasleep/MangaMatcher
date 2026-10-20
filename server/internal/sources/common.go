@@ -21,6 +21,7 @@ type Candidate struct {
 	MoxID    string // bookof.moe 内部 id
 	MdID     string // MangaDex uuid
 	BaikeID  string // 百度百科 lemma id（字符串化的数字）
+	EhID     string // E-Hentai 内部 id（"gid/token"）
 }
 
 // CandidateNames 候选名（标题/原名/别名）。

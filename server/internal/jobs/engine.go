@@ -28,18 +28,18 @@ type JobOptions struct {
 
 // Job 任务。
 type Job struct {
-	ID         string    `json:"id"`
-	Kind       string    `json:"kind"` // scrape|tag
-	LibraryID  string    `json:"libraryId"`
-	Total      int       `json:"total"`
-	Done       int       `json:"done"`
-	OK         int       `json:"ok"`
-	Failed     int       `json:"failed"`
-	Status     string    `json:"status"` // running|done|canceled
-	DryRun     bool      `json:"dryRun"`
-	StartedAt  time.Time `json:"startedAt"`
+	ID         string     `json:"id"`
+	Kind       string     `json:"kind"` // scrape|tag
+	LibraryID  string     `json:"libraryId"`
+	Total      int        `json:"total"`
+	Done       int        `json:"done"`
+	OK         int        `json:"ok"`
+	Failed     int        `json:"failed"`
+	Status     string     `json:"status"` // running|done|canceled
+	DryRun     bool       `json:"dryRun"`
+	StartedAt  time.Time  `json:"startedAt"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
-	Items      []Item    `json:"items,omitempty"`
+	Items      []Item     `json:"items,omitempty"`
 
 	cancel context.CancelFunc
 	log    *slog.Logger
@@ -51,8 +51,8 @@ type Engine struct {
 	jobs         map[string]*Job
 	seq          int
 	log          *slog.Logger
-	komgaFactory func() *komga.Client              // 按最新设置构建 Komga 客户端
-	newRunner    func(dryRun bool) *scrape.Runner // 由 api 层注入（含最新设置）
+	komgaFactory func() *komga.Client                   // 按最新设置构建 Komga 客户端
+	newRunner    func(dryRun bool) *scrape.Runner       // 由 api 层注入（含最新设置）
 	OnDone       func(jobID string, seriesIDs []string) // 任务结束钩子（缓存回源等；api 层注入）
 }
 
@@ -100,15 +100,23 @@ func (e *Engine) SubmitApply(series *komga.SeriesDto, source, id string, dryRun 
 	runner.Sources = sc
 	svc := runner.NewService()
 	go func() {
-	// API source 名（SPEC：bangumi|bookwalker|mox|mangadex|baike）→ 内部标签
-	apiSource := source
-	switch source {
-	case "bangumi":
-		apiSource = "Bgm"
-	case "bookwalker":
-		apiSource = "Bw"
-	}
-	outcome := &scrape.MatchOutcome{Source: apiSource, MatchTitle: id}
+		// API source 名（SPEC：bangumi|bookwalker|mox|mangadex|baike|ehentai）→ 内部标签
+		apiSource := source
+		switch source {
+		case "bangumi":
+			apiSource = "Bgm"
+		case "bookwalker":
+			apiSource = "Bw"
+		case "mox":
+			apiSource = "Mox"
+		case "mangadex":
+			apiSource = "MangaDex"
+		case "baike":
+			apiSource = "Baike"
+		case "ehentai", "EH":
+			apiSource = "EH"
+		}
+		outcome := &scrape.MatchOutcome{Source: apiSource, MatchTitle: id}
 		switch source {
 		case "bangumi":
 			fmt.Sscanf(id, "%d", &outcome.SubjectID)
@@ -125,6 +133,9 @@ func (e *Engine) SubmitApply(series *komga.SeriesDto, source, id string, dryRun 
 		case "baike":
 			outcome.BaikeTitle = id
 			outcome.MatchTitle = id
+		case "ehentai", "EH":
+			// id = "gid/token"（候选/链接解析产出的 EhID 形状）
+			outcome.EhID = id
 		}
 		res := svc.ScrapeOutcome(series, outcome, true) // ReplaceMatch：旧链接剔除、锁解锁重写、全部卷重抓
 		item := Item{SeriesID: series.ID, SeriesName: series.Name,

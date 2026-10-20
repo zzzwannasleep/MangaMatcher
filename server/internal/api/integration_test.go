@@ -430,6 +430,8 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
+	// 绝不出网：E-Hentai 指向本地死端口（墙内直连表站会等到超时，拖死测试）。
+	stubEhSource(t)
 	km := newMockKomga()
 	km.seedSeries("s1", "lib1", "[碧蓝之海][井上堅二×吉岡公威][Vol.01-Vol.05]")
 

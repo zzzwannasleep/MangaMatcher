@@ -32,6 +32,7 @@ const form = reactive({
   },
   baikeEnabled: true,
   mangaDexEnabled: true,
+  ehEnabled: true,
   batchForceRefresh: false,
   bookwalker: { downloadURL: '', writeExtras: true },
   versionTagWhitelistText: '',
@@ -90,6 +91,7 @@ async function load() {
     form.ai.writeSummary = !!ai.writeSummary
     form.baikeEnabled = data.baikeEnabled !== false
     form.mangaDexEnabled = data.mangaDexEnabled !== false
+    form.ehEnabled = data.ehEnabled !== false
     form.batchForceRefresh = !!data.batchForceRefresh
     const bw = data.bookwalker || {}
     form.bookwalker.downloadURL = bw.downloadURL || ''
@@ -188,6 +190,7 @@ async function save() {
       },
       baikeEnabled: form.baikeEnabled,
       mangaDexEnabled: form.mangaDexEnabled,
+      ehEnabled: form.ehEnabled,
       batchForceRefresh: form.batchForceRefresh,
       bookwalker: {
         downloadURL: form.bookwalker.downloadURL.trim(),
@@ -765,7 +768,7 @@ onBeforeUnmount(() => {
           <input type="checkbox" v-model="form.baikeEnabled" />
           <span>
             <strong>百度百科兜底</strong>
-            <small>五源链末端：开放卡片接口补封面与概述</small>
+            <small>六源链末端：开放卡片接口补封面与概述</small>
           </span>
         </label>
 
@@ -774,6 +777,15 @@ onBeforeUnmount(() => {
           <span>
             <strong>MangaDex</strong>
             <small>公开 API，zh-Hans 标题，AI 翻译简介</small>
+          </span>
+        </label>
+
+        <label class="toggle-row">
+          <input type="checkbox" v-model="form.ehEnabled" />
+          <span>
+            <strong>E-Hentai（表站）</strong>
+            <small>需要能访问 e-hentai.org（大陆需在代理里配置）</small>
+            <small>标签按 12 条上限写入，中文标签自动翻译</small>
           </span>
         </label>
 

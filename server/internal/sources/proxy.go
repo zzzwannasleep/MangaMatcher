@@ -1,4 +1,4 @@
-// Package sources：v2 五源客户端 + 代理（移植自 KomgaScraper.Core/Sources）。
+// Package sources：v2 各源客户端 + 代理（移植自 KomgaScraper.Core/Sources）。
 // proxy.go：代理配置 → http.Transport（http/https 走 HTTP CONNECT，socks4/4a/5 纯 Go 握手）。
 package sources
 
@@ -88,7 +88,7 @@ func itoa(n int) string {
 }
 
 // NewHTTPClient 构建 HTTP 客户端：可选代理 + 超时 + UA（+可选 Referer）。
-// Komga 永远直连——本工厂只服务 bangumi/封面下载/BW 下载/五源请求。
+// Komga 永远直连——本工厂只服务 bangumi/封面下载/BW 下载/各源请求。
 func NewHTTPClient(p ProxyConfig, timeout time.Duration, userAgent, referrer string) (*http.Client, error) {
 	if p.IsSet() {
 		if msg := p.Validate(); msg != "" {

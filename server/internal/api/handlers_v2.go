@@ -121,8 +121,8 @@ func (s *Server) handleLibrarySeries(w http.ResponseWriter, r *http.Request) {
 	}
 	states, _ := s.store.ListScrapeStates(ids)
 	resp := struct {
-		Content         []any  `json:"content"`
-		TotalElements   int64  `json:"totalElements"`
+		Content          []any `json:"content"`
+		TotalElements    int64 `json:"totalElements"`
 		NumberOfElements int   `json:"numberOfElements,omitempty"`
 	}{Content: []any{}, TotalElements: data.TotalElements, NumberOfElements: data.NumberOfElements}
 	for _, series := range data.Content {
@@ -198,13 +198,13 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type searchItem struct {
-		ID          string               `json:"id"`
-		Name        string               `json:"name"`
-		LibraryID   string               `json:"libraryId"`
-		LibraryName string               `json:"libraryName"`
-		BooksCount  int                  `json:"booksCount"`
+		ID          string                   `json:"id"`
+		Name        string                   `json:"name"`
+		LibraryID   string                   `json:"libraryId"`
+		LibraryName string                   `json:"libraryName"`
+		BooksCount  int                      `json:"booksCount"`
 		Metadata    *komga.SeriesMetadataDto `json:"metadata,omitempty"`
-		State       map[string]any       `json:"state,omitempty"`
+		State       map[string]any           `json:"state,omitempty"`
 	}
 	var out []searchItem
 	// 缓存启用且就绪 → 内存检索（零 Komga 请求）
@@ -579,6 +579,8 @@ func candidateToWire(c sources.Candidate) candidateWire {
 		id = c.MdID
 	case "Baike":
 		id = c.BaikeID
+	case sources.EhSource:
+		id = c.EhID
 	}
 	return candidateWire{ID: id, Title: c.Title, OriTitle: c.OriTitle,
 		Author: c.Author, Aliases: c.Aliases, CoverURL: c.CoverURL, Source: c.Source}
@@ -609,7 +611,7 @@ func (s *Server) handleMatchCandidates(w http.ResponseWriter, r *http.Request) {
 	st := s.LoadSettings()
 	sc, err := s.buildSources(st)
 	if err != nil {
-		writeError(w, 500, "构建五源客户端失败: "+err.Error())
+		writeError(w, 500, "源客户端构建失败: "+err.Error())
 		return
 	}
 	ctx := r.Context()
@@ -679,19 +681,72 @@ func (s *Server) handleMatchCandidates(w http.ResponseWriter, r *http.Request) {
 				Author: card.Field("作者"), Source: "Baike", BaikeID: fmt.Sprint(card.LemmaID)}})
 		}
 	}
+	// E-Hentai（表站）
+	if sc.EH != nil {
+		if hits, err := sc.EH.Candidates(ctx, q, 25); err != nil {
+			s.log.Warn("E-Hentai 候选搜索失败: " + err.Error())
+		} else if len(hits) > 0 {
+			groups["ehentai"] = toWireList(hits)
+		}
+	}
 	writeJSON(w, 200, map[string]any{"groups": groups})
 }
 
 // matchDetail 来源详情（预览区共用 wire 结构）。
 type matchDetail struct {
-	Source   string `json:"source"`
-	ID       string `json:"id"`
-	Title    string `json:"title"`
-	OriTitle string `json:"oriTitle"`
-	Author   string `json:"author"`
-	Aliases  string `json:"aliases"`
-	Summary  string `json:"summary"`
-	CoverURL string `json:"coverUrl"`
+	Source   string   `json:"source"`
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	OriTitle string   `json:"oriTitle"`
+	Author   string   `json:"author"`
+	Aliases  string   `json:"aliases"`
+	Summary  string   `json:"summary"`
+	CoverURL string   `json:"coverUrl"`
+	Tags     []string `json:"tags,omitempty"`    // E-Hentai 预览标签：中文、与写库同源（其它源留空）
+	TagsRaw  []string `json:"tagsRaw,omitempty"` // E-Hentai 原始 ns:tag（排查/调试用）
+	URL      string   `json:"url,omitempty"`     // 来源页（E-Hentai 画廊地址）
+}
+
+// ehTagLimit 预览/写库共用的标签条数上限（唯一定义在 scrape.EhTagLimit，避免两处常量漂移）。
+const ehTagLimit = scrape.EhTagLimit
+
+// ehArtistOf 取画廊标签里的第一个 artist:（画师），填详情预览的作者位。
+func ehArtistOf(tags []string) string {
+	for _, t := range tags {
+		if v, ok := strings.CutPrefix(t, "artist:"); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// ehSummaryOf 画廊元信息摘要（E-Hentai 无简介字段，用可核对的事实拼装，避免空预览）。
+// shown = 预览标签（scrape.EhDisplayTags 结果），末尾拼「标签：N/上限」；原始条数超上限时写真实总数，提示被截断。
+func ehSummaryOf(g *sources.EhGallery, shown []string) string {
+	parts := make([]string, 0, 6)
+	if g.Category != "" {
+		parts = append(parts, "分类："+g.Category)
+	}
+	if g.FileCount != "" {
+		parts = append(parts, "页数："+g.FileCount)
+	}
+	if g.Filesize != "" {
+		parts = append(parts, "大小："+g.Filesize)
+	}
+	if g.Rating != "" {
+		parts = append(parts, "评分："+g.Rating)
+	}
+	if g.Uploader != "" {
+		parts = append(parts, "上传者："+g.Uploader)
+	}
+	if len(g.Tags) > 0 {
+		total := ehTagLimit
+		if len(g.Tags) > ehTagLimit {
+			total = len(g.Tags)
+		}
+		parts = append(parts, fmt.Sprintf("标签：%d/%d", len(shown), total))
+	}
+	return strings.Join(parts, "｜")
 }
 
 // fetchMatchDetail 按来源拉取详情（handleMatchDetail / handleMatchResolve 共用）。
@@ -701,7 +756,7 @@ func (s *Server) fetchMatchDetail(source, id string) (*matchDetail, int, error) 
 	st := s.LoadSettings()
 	sc, err := s.buildSources(st)
 	if err != nil {
-		return nil, 500, fmt.Errorf("构建五源客户端失败: %w", err)
+		return nil, 500, fmt.Errorf("源客户端构建失败: %w", err)
 	}
 	d := &matchDetail{Source: source, ID: id}
 	switch source {
@@ -778,6 +833,27 @@ func (s *Server) fetchMatchDetail(source, id string) (*matchDetail, int, error) 
 		}
 		d.Title, d.OriTitle, d.Summary, d.CoverURL = md.Title, md.OriTitle, md.Description, md.CoverURL
 		d.Aliases = strings.Join(md.AltTitles, " / ")
+	case "ehentai", sources.EhSource:
+		// id 形如 "gid/token"（candidateToWire 的 EhID；链接解析也归一成这个形状）
+		if sc.EH == nil {
+			return nil, 400, fmt.Errorf("E-Hentai 未启用")
+		}
+		g, err := sc.EH.GetGallery(ctx, id)
+		if err != nil {
+			return nil, 502, fmt.Errorf("获取 E-Hentai 画廊详情失败: %w", err)
+		}
+		if g == nil {
+			return nil, 404, fmt.Errorf("E-Hentai 画廊不存在: %s", id)
+		}
+		d.Source = "ehentai" // 统一成前端分组 key（候选路径传进来的是内部标签 EH）
+		d.Title, d.OriTitle = g.Title, g.TitleJpn
+		d.Author = ehArtistOf(g.Tags)
+		// 预览标签与写库同源（中文 + 命名空间优先级 + 12 条上限），原始值另存 tagsRaw
+		d.Tags = scrape.EhDisplayTags(g.Tags, ehTagLimit)
+		d.TagsRaw = g.Tags
+		d.Summary = ehSummaryOf(g, d.Tags)
+		d.CoverURL = sc.EH.CoverURL(g)
+		d.URL = g.URL
 	case "baike":
 		if sc.Baike == nil {
 			return nil, 400, fmt.Errorf("百度百科未启用")
@@ -814,8 +890,12 @@ func (s *Server) handleMatchDetail(w http.ResponseWriter, r *http.Request) {
 // baikeItemNameRe 百度百科 /item/ 词条名（可带 /<lemmaID> 尾段）。
 var baikeItemNameRe = regexp.MustCompile(`baike\.baidu\.com/item/([^/?#]+)`)
 
+// ehGalleryIDRe E-Hentai 画廊 id（"gid/token" 裸写法，便于直接粘贴候选 id 调试）。
+var ehGalleryIDRe = regexp.MustCompile(`^\d+/[0-9a-zA-Z]{6,}$`)
+
 // handleMatchResolve POST /api/match/resolve {url} → 识别链接来源并返回预览详情。
-// 支持：Bangumi 链接（bgm.tv/bangumi.tv/subject/N）、纯 Bangumi ID、百度百科词条链接。
+// 支持：Bangumi 链接（bgm.tv/bangumi.tv/subject/N）、纯 Bangumi ID、百度百科词条链接、
+// E-Hentai / ExHentai 画廊链接（https://e-hentai.org/g/123/abc/ 等，数据只走表站）。
 func (s *Server) handleMatchResolve(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		URL string `json:"url"`
@@ -835,6 +915,16 @@ func (s *Server) handleMatchResolve(w http.ResponseWriter, r *http.Request) {
 		source, id = "bangumi", raw
 	case btvIDRe.MatchString(raw):
 		source, id = "bangumi", extractBgmID(raw)
+	case sources.IsEhGalleryLink(raw):
+		gid, token, ok := sources.ParseEhID(raw)
+		if !ok {
+			writeError(w, 400, "无法从 E-Hentai 画廊链接解析 gid/token: "+raw)
+			return
+		}
+		source, id = "ehentai", sources.EhID(gid, token)
+	case ehGalleryIDRe.MatchString(raw):
+		// 裸 id（gid/token）：正则已保证形状，直接当 id 用（与候选 id 同构）
+		source, id = "ehentai", raw
 	case baikeItemNameRe.MatchString(raw):
 		m := baikeItemNameRe.FindStringSubmatch(raw)
 		name, err := url.PathUnescape(m[1])
@@ -845,7 +935,8 @@ func (s *Server) handleMatchResolve(w http.ResponseWriter, r *http.Request) {
 		// 词条 id 即词条标题（与候选/应用链路一致：baike 源以词条名为键）
 		source, id = "baike", strings.TrimSpace(name)
 	default:
-		writeError(w, 400, "无法识别的链接：支持 Bangumi 条目链接/ID 或百度百科词条链接")
+		writeError(w, 400, "无法识别的链接：支持 Bangumi 条目链接/ID、百度百科词条链接或 E-Hentai 画廊链接"+
+			"（如 https://e-hentai.org/g/123456/abcdef/）")
 		return
 	}
 	d, code, err := s.fetchMatchDetail(source, id)
@@ -897,7 +988,7 @@ func (s *Server) handleMatchApply(w http.ResponseWriter, r *http.Request) {
 	st := s.LoadSettings()
 	sc, err := s.buildSources(st)
 	if err != nil {
-		writeError(w, 500, "构建五源客户端失败: "+err.Error())
+		writeError(w, 500, "源客户端构建失败: "+err.Error())
 		return
 	}
 	// 单系列任务：后台执行，前端跳任务详情。dryRun 缺省才用 dryRunDefault，显式值必须尊重。
@@ -958,8 +1049,8 @@ func (s *Server) handleManualCollection(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	type seriesItem struct {
-		ID     string `json:"id"`
-		Name   string `json:"name"`
+		ID        string `json:"id"`
+		Name      string `json:"name"`
 		LibraryID string `json:"libraryId"`
 	}
 	var list []seriesItem
@@ -1235,14 +1326,14 @@ func (s *Server) handleCacheStatus(w http.ResponseWriter, r *http.Request) {
 	st := s.LoadSettings()
 	last := s.cache.LastSyncAt()
 	writeJSON(w, 200, map[string]any{
-		"enabled":       st.Cache.Enabled,
+		"enabled":        st.Cache.Enabled,
 		"refreshMinutes": st.Cache.RefreshMinutes,
-		"ready":         s.cache.Ready(),
-		"refreshing":    s.cache.IsRefreshing(),
-		"seriesCount":   s.cache.SeriesCount(),
-		"libraryCount":  s.cache.LibraryCount(),
-		"lastSync":      last,
-		"ageMinutes":    int(time.Since(last).Minutes()),
+		"ready":          s.cache.Ready(),
+		"refreshing":     s.cache.IsRefreshing(),
+		"seriesCount":    s.cache.SeriesCount(),
+		"libraryCount":   s.cache.LibraryCount(),
+		"lastSync":       last,
+		"ageMinutes":     int(time.Since(last).Minutes()),
 	})
 }
 
@@ -1297,7 +1388,7 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 
 // ---------- 源客户端构建（候选/详情端点共用） ----------
 
-// buildSources 按设置构建五源客户端（不含 BW 索引加载失败时的降级：返回 nil 索引）。
+// buildSources 按设置构建源客户端（AI/BW/Mox/MangaDex/百科/E-Hentai；不含 BW 索引加载失败时的降级：返回 nil 索引）。
 func (s *Server) buildSources(st Settings) (scrape.SourceClients, error) {
 	sc := scrape.SourceClients{}
 	pc := sources.ProxyConfig{Protocol: st.Proxy.Protocol, Host: st.Proxy.Host, Port: st.Proxy.Port,
@@ -1325,6 +1416,13 @@ func (s *Server) buildSources(st Settings) (scrape.SourceClients, error) {
 	if st.BaikeEnabled {
 		if bk, err := sources.NewBaikeClient(baikeBaseOverride); err == nil {
 			sc.Baike = bk
+		}
+	}
+	if st.EhEnabled {
+		if eh, err := sources.NewEhClient(pc, ehBaseOverride, scrape.SlogLogger{L: s.log}, ehPaceOverrideMs); err == nil {
+			sc.EH = eh
+		} else {
+			s.log.Warn("E-Hentai 客户端创建失败: " + err.Error())
 		}
 	}
 	return sc, nil

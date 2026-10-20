@@ -16,6 +16,7 @@ const (
 	SourceMox      = "Mox"
 	SourceBaike    = "Baike"
 	SourceMangaDex = "MangaDex"
+	SourceEH       = "EH"
 )
 
 // IsBtvLink Bangumi 站链接判定（bangumi.tv / bgm.tv / chii.in 及子域）。
@@ -44,19 +45,20 @@ func btvSubjectID(u string) int {
 
 // MatchOutcome 单系列匹配结果（链路产物）。
 type MatchOutcome struct {
-	Source     string // Bgm|Bw|Mox|MangaDex|Baike
+	Source     string // Bgm|Bw|Mox|MangaDex|Baike|EH
 	SubjectID  int    // Bgm 用
 	BwID       string
 	MoxID      string
 	MdID       string
 	BaikeTitle string // 百科无 id 定位，用词条标题重查
+	EhID       string // E-Hentai 内部 id（"gid/token"）
 	MatchTitle string
 }
 
 // RunChain 匹配回退链（SPEC-v2 第 7 节，顺序对齐桌面版 BatchMatcher.PreciseMatchAsync）：
 //
 //	Bangumi精确 → BookWalker索引 → AI识别(拿不到时问AI作品名 jp/cn/en → 三名各重搜 Bangumi/BW/Mox)
-//	→ AI智能选择(多候选) → Mox → AI中文译日文再查BW → MangaDex → 百度百科 → 失败
+//	→ AI智能选择(多候选) → Mox → AI中文译日文再查BW → MangaDex → E-Hentai → 百度百科 → 失败
 //
 // 单源失败不中断整链；AI 结果进程内缓存；候选>12 先按相似度截断再给 AI。
 // matchType：Bangumi platform 过滤（漫画/小说）。
@@ -273,7 +275,7 @@ func (s *Service) RunChain(ctx context.Context, series *komga.SeriesDto, seriesN
 			var cands []sources.Candidate
 			for _, m := range filtered {
 				cands = append(cands, sources.Candidate{BgmID: 0, Title: m.Title, OriTitle: m.OriTitle,
-					Aliases: strings.Join(m.AltTitles[:minInt(len(m.AltTitles), 4)], " / "),
+					Aliases:  strings.Join(m.AltTitles[:minInt(len(m.AltTitles), 4)], " / "),
 					CoverURL: m.CoverURL, Source: SourceMangaDex, MdID: m.ID})
 			}
 			mdPick := sources.FindPreciseMatch(cands, text.ExtractAndNormalizeTitle(t))
@@ -290,7 +292,60 @@ func (s *Service) RunChain(ctx context.Context, series *komga.SeriesDto, seriesN
 		}
 	}
 
-	// ---- 7. 百度百科（词条卡片）—— 冷门漫画最终兜底 ----
+	// ---- 7. E-Hentai 表站（同人志/画集兜底；命中判定保守，宁缺毋滥）----
+	//
+	// 精度关键：EH 的 f_search 支持标签语法，纯文本搜索在脏标题场景下几乎必错
+	// （实测 f_search=asanagi 首条是无关作品，f_search=artist:asanagi 全是该作者的作品）。
+	// 所以先按前 3 个候选词做文本搜索，再用文件名方括号段做一次 artist: 标签搜索，
+	// 两路结果按 EhID 合并去重后统一判定（每系列最多 4 次请求，EH 节流 1100ms）。
+	if s.EH != nil {
+		var hits []sources.Candidate
+		seen := map[string]bool{}
+		addHits := func(list []sources.Candidate) {
+			for _, c := range list {
+				if c.EhID != "" {
+					if seen[c.EhID] {
+						continue
+					}
+					seen[c.EhID] = true
+				}
+				hits = append(hits, c)
+			}
+		}
+		for i, t := range terms {
+			if i >= 3 {
+				break
+			}
+			list, err := s.EH.Candidates(ctx, t, 25)
+			if err != nil {
+				s.Log.Warn("《" + seriesName + "》E-Hentai 搜索失败（\"" + t + "\"）: " + err.Error())
+				continue
+			}
+			addHits(list)
+		}
+		if author := ehArtistTag(seriesName); author != "" {
+			list, err := s.EH.CandidatesTag(ctx, "artist", author, 25)
+			if err != nil {
+				s.Log.Warn("《" + seriesName + "》E-Hentai artist 标签搜索失败（\"" + author + "\"）: " + err.Error())
+			} else {
+				s.Log.Info("《" + seriesName + "》E-Hentai artist:\"" + author + "\" 标签搜索得 " + itoa(len(list)) + " 个候选")
+				addHits(list)
+			}
+		}
+		for i, t := range terms {
+			if i >= 3 {
+				break
+			}
+			hit := pickEhCandidate(hits, t)
+			if hit == nil {
+				continue
+			}
+			s.Log.Info("《" + seriesName + "》E-Hentai 命中:《" + hit.Title + "》，刮削中…")
+			return &MatchOutcome{Source: SourceEH, EhID: hit.EhID, MatchTitle: hit.Title}, nil
+		}
+	}
+
+	// ---- 8. 百度百科（词条卡片）—— 冷门漫画最终兜底 ----
 	if s.Baike != nil {
 		var bkTerms []string
 		if identify != nil && identify.Cn != "" {
@@ -390,6 +445,115 @@ func (s *Service) tryMoxSearch(ctx context.Context, seriesName, term, searchTerm
 	return &MatchOutcome{Source: SourceMox, MoxID: moxDetail.ID, MatchTitle: moxDetail.Title}
 }
 
+// ehTagNoiseExact 语言/版本/格式标记：按「词」精确比对（避免误伤 Draw/Strawberry 这类作者名）。
+var ehTagNoiseExact = map[string]bool{
+	"chinese": true, "english": true, "japanese": true, "korean": true,
+	"digital": true, "decensored": true, "uncensored": true, "translated": true, "raw": true,
+}
+
+// ehTagNoisePart 汉化/版本标记：子串比对（中文词不会误伤英文作者名）。
+var ehTagNoisePart = []string{"汉化", "中文", "日文", "英文", "无修正", "無修正", "全彩", "同人志", "同人誌", "dl版", "卷", "册", "话", "話"}
+
+// ehIsTagNoise 该方括号段是否是语言/版本/格式标记（不该拿去当 artist 搜索词）。
+func ehIsTagNoise(s string) bool {
+	low := strings.ToLower(s)
+	for _, m := range ehTagNoisePart {
+		if strings.Contains(low, m) {
+			return true
+		}
+	}
+	for _, tok := range strings.FieldsFunc(low, func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+	}) {
+		if ehTagNoiseExact[tok] {
+			return true
+		}
+	}
+	return false
+}
+
+// ehArtistTag 从文件名方括号段挑一个能做 EH `artist:` 标签搜索的名字：
+// 优先「社团 (画师)」括号里的画师名（[MTSP (Jin)] → Jin），其次不含空格的段；
+// 跳过语言/版本/格式标记。第 1 个方括号段通常是标题，所以先扫 parts[1:] 再兜底 parts[0]。
+func ehArtistTag(seriesName string) string {
+	parts := text.ExtractBracketParts(seriesName)
+	var order []string
+	if len(parts) > 1 {
+		order = append(order, parts[1:]...)
+	}
+	if len(parts) > 0 {
+		order = append(order, parts[0])
+	}
+	for _, raw := range order {
+		s := strings.TrimSpace(raw)
+		if len([]rune(s)) < 2 || len([]rune(s)) > 40 || ehIsTagNoise(s) {
+			continue
+		}
+		// [MTSP (Jin)] → 括号内的画师名才是 EH 的 artist 标签
+		if i := strings.LastIndex(s, "("); i >= 0 && strings.HasSuffix(s, ")") {
+			if inner := strings.TrimSpace(s[i+1 : len(s)-1]); len([]rune(inner)) >= 2 &&
+				len([]rune(inner)) <= 40 && !strings.ContainsAny(inner, " \t") {
+				return inner
+			}
+		}
+		if !strings.ContainsAny(s, " \t") {
+			return s
+		}
+	}
+	return ""
+}
+
+// pickEhCandidate EH 保守命中判定（宁缺毋滥，避免同人志海量同人作品误配）：
+// ① 精确匹配（FindPreciseMatch，含残留垃圾词检查）直接采纳；
+// ② 否则只认「搜索词 ≥6 rune 且 top1 相似度 ≥0.55」——短词（2-3 字日文标题）相似度不可靠，一律不认。
+func pickEhCandidate(hits []sources.Candidate, term string) *sources.Candidate {
+	if p := sources.FindPreciseMatch(hits, text.ExtractAndNormalizeTitle(term)); p != nil {
+		return p
+	}
+	if len([]rune(term)) < 6 {
+		return nil
+	}
+	top := sources.RankCandidates(hits, term, 1)
+	if len(top) == 0 || ehSim(top[0], term) < 0.55 {
+		return nil
+	}
+	return &top[0]
+}
+
+// ehSim 候选名与搜索词的 bigram Jaccard（与 sources.RankCandidates 同口径：取最佳候选名）。
+// sources 包未导出相似度函数，这里内联一份，不动 sources 导出面。
+func ehSim(c sources.Candidate, term string) float64 {
+	grams := func(s string) map[string]bool {
+		set := map[string]bool{}
+		r := []rune(s)
+		if len(r) == 1 {
+			set[s] = true
+		}
+		for i := 0; i+1 < len(r); i++ {
+			set[string(r[i:i+2])] = true
+		}
+		return set
+	}
+	tg := grams(text.ExtractAndNormalizeTitle(term))
+	best := 0.0
+	for _, n := range sources.CandidateNames(c) {
+		g := grams(text.ExtractAndNormalizeTitle(n))
+		if len(g) == 0 || len(tg) == 0 {
+			continue
+		}
+		inter := 0
+		for x := range g {
+			if tg[x] {
+				inter++
+			}
+		}
+		if j := float64(inter) / float64(len(g)+len(tg)-inter); j > best {
+			best = j
+		}
+	}
+	return best
+}
+
 // bgmToCandidate Bangumi 搜索候选 → 跨源候选。
 func bgmToCandidate(c bangumi.SearchCandidate) sources.Candidate {
 	return sources.Candidate{BgmID: c.ID, Title: c.Title, OriTitle: c.OriTitle, Author: c.Author,
@@ -444,6 +608,18 @@ func (s *Service) ScrapeOutcome(series *komga.SeriesDto, out *MatchOutcome, repl
 			return &SeriesResult{Error: "MangaDex 条目不存在: " + out.MdID}
 		}
 		return s.scrapeFromMangaDex(series, md, replace)
+	case SourceEH:
+		if s.EH == nil {
+			return &SeriesResult{Error: "E-Hentai 源未启用"}
+		}
+		g, err := s.EH.GetGallery(context.Background(), out.EhID)
+		if err != nil {
+			return &SeriesResult{Error: "获取 E-Hentai 画廊详情失败: " + err.Error()}
+		}
+		if g == nil {
+			return &SeriesResult{Error: "E-Hentai 画廊不存在: " + out.EhID}
+		}
+		return s.scrapeFromEH(series, g, replace)
 	case SourceBaike:
 		card, err := s.Baike.SearchCard(context.Background(), out.BaikeTitle)
 		if err != nil {

@@ -28,8 +28,8 @@ type Runner struct {
 	Concurrency    int // worker pool 并发数（来自全局设置）
 
 	// ---- v2 ----
-	Sources         SourceClients
-	MatchType       string // 漫画|小说（Bangumi platform 过滤）
+	Sources          SourceClients
+	MatchType        string // 漫画|小说（Bangumi platform 过滤）
 	TranslateSummary bool
 	AIWriteSummary   bool
 	AIIdentify       bool
@@ -68,7 +68,7 @@ func (r *Runner) newService() *Service {
 		Komga: r.Komga, Bangumi: r.Bangumi, Log: r.Log, Manual: manual,
 		DryRun: r.DryRun, FetchVolumes: r.FetchVolumes, WithCovers: r.WithCovers,
 		AI: r.Sources.AI, BW: r.Sources.BW, Mox: r.Sources.Mox,
-		MangaDex: r.Sources.MangaDex, Baike: r.Sources.Baike,
+		MangaDex: r.Sources.MangaDex, Baike: r.Sources.Baike, EH: r.Sources.EH,
 		State: r.State, TranslateSummary: r.TranslateSummary, AIWriteSummary: r.AIWriteSummary,
 		AIIdentify: r.AIIdentify, AISmartPick: r.AISmartPick,
 		BwWriteTags: r.BwWriteTags, Whitelist: r.Whitelist, Blacklist: r.Blacklist,
@@ -135,7 +135,7 @@ func (r *Runner) ProcessSeries(ctx context.Context, series *komga.SeriesDto) Ser
 	var outcome *MatchOutcome
 	var matchErr error
 	if r.Sources.AI == nil && r.Sources.BW == nil && r.Sources.Mox == nil &&
-		r.Sources.MangaDex == nil && r.Sources.Baike == nil {
+		r.Sources.MangaDex == nil && r.Sources.Baike == nil && r.Sources.EH == nil {
 		// v1 纯 Bangumi 链（无任何 v2 源配置时行为与 v1 完全一致）
 		search := func(keyword string) ([]bangumiSearchCandidate, error) {
 			return r.Bangumi.SearchSubjects(keyword, r.matchType(), 0)

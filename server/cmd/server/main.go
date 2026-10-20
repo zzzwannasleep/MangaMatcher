@@ -21,6 +21,8 @@ import (
 
 	"komgabangumi/internal/api"
 	"komgabangumi/internal/auth"
+	"komgabangumi/internal/ehtags"
+	"komgabangumi/internal/sources"
 	"komgabangumi/internal/store"
 	"komgabangumi/internal/update"
 )
@@ -81,14 +83,9 @@ func main() {
 		os.Getenv("MOX_API_BASE"),
 		os.Getenv("MANGADEX_API_BASE"),
 		os.Getenv("BAIKE_API_BASE"),
-		func() int {
-			if v := os.Getenv("MOX_PACE_MS"); v != "" {
-				if n, err := strconv.Atoi(v); err == nil {
-					return n
-				}
-			}
-			return 0
-		}(),
+		os.Getenv("EH_API_BASE"),
+		envInt("MOX_PACE_MS"),
+		envInt("EH_PACE_MS"), // EH 节流：0 = 默认 1100ms（表站 ≥1s/请求）
 	)
 
 	// 首次启动 bootstrap 管理员
@@ -115,12 +112,52 @@ func main() {
 	log.Info("构建版本: " + version)
 	server := api.NewServer(st, am, log)
 	server.SetDataDir(dataDir)
+	// E-Hentai 标签中文映射库：后台准备（幂等、失败只告警，绝不阻塞启动）
+	go setupEhTags(server, dataDir, log)
 	server.Start() // 库缓存：从 SQLite 恢复 + 自动对齐 Komga（间隔由设置驱动）
 
 	log.Info("KomgaBangumi 后端启动: http://0.0.0.0:" + port + "（数据目录 " + dataDir + "）")
 	if err := http.ListenAndServe(":"+port, server.Router()); err != nil {
 		log.Error("HTTP 服务退出: " + err.Error())
 		os.Exit(1)
+	}
+}
+
+// envInt 读整型环境变量（空/非法 → 0，由调用方解释 0 的语义）。
+func envInt(name string) int {
+	if v := os.Getenv(name); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return 0
+}
+
+// setupEhTags 准备 E-Hentai 标签中文映射数据（异步、幂等；走设置里的统一代理，无代理则直连）。
+// 失败只告警：标签库不可用时 scrape 层回落原始标签，不影响启动与刮削主链路。
+func setupEhTags(s *api.Server, dataDir string, log *slog.Logger) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warn("EH 标签库初始化异常，已跳过", "panic", r)
+		}
+	}()
+	if dataDir == "" {
+		dataDir = "./data"
+	}
+	st := s.LoadSettings()
+	pc := sources.ProxyConfig{Protocol: st.Proxy.Protocol, Host: st.Proxy.Host, Port: st.Proxy.Port,
+		Username: st.Proxy.Username, Password: st.Proxy.Password}
+	var hc *http.Client
+	if pc.IsSet() {
+		if c, err := sources.NewHTTPClient(pc, 60*time.Second, "", ""); err == nil {
+			hc = c
+		} else {
+			log.Warn("EH 标签库代理客户端创建失败，改直连: " + err.Error())
+		}
+	}
+	ehtags.Configure(dataDir, hc, func(msg string) { log.Warn("EH 标签库: " + msg) })
+	if !ehtags.Ready() {
+		log.Info("EH 标签库准备中：未就绪时标签写入回落原文")
 	}
 }
 

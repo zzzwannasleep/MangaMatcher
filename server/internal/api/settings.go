@@ -65,6 +65,7 @@ type Settings struct {
 	AI                  AISettings         `json:"ai"`
 	BaikeEnabled        bool               `json:"baikeEnabled"`
 	MangaDexEnabled     bool               `json:"mangaDexEnabled"`
+	EhEnabled           bool               `json:"ehEnabled"` // E-Hentai（表站）源开关；默认 true
 	BookWalker          BookWalkerSettings `json:"bookwalker"`
 	BatchForceRefresh   bool               `json:"batchForceRefresh"`
 	VersionTagWhitelist []string           `json:"versionTagWhitelist"`
@@ -92,13 +93,14 @@ func (s *Server) LoadSettings() Settings {
 		MatchType:            "漫画",
 		BaikeEnabled:         true,
 		MangaDexEnabled:      true,
+		EhEnabled:            true,
 		Cache:                CacheSettings{Enabled: true, RefreshMinutes: 60},
 		Update:               UpdateSettings{AutoCheck: true},
 		BookWalker: BookWalkerSettings{
 			DownloadURL: "https://data.bookwalker.com/bkwk-db.sqlite.zst",
 			WriteExtras: true,
 		},
-		AI: AISettings{BaseURL: "https://api.deepseek.com", Model: "deepseek-chat", Identify: true, SmartPick: true},
+		AI:      AISettings{BaseURL: "https://api.deepseek.com", Model: "deepseek-chat", Identify: true, SmartPick: true},
 		DataDir: s.dataDir,
 	}
 	if v, ok := s.store.GetSetting("settings"); ok {
@@ -146,6 +148,11 @@ func (s *Server) LoadSettings() Settings {
 				st.MangaDexEnabled = true
 			} else {
 				st.MangaDexEnabled = raw
+			}
+			if raw, ok := rawHasKey(v, "ehEnabled"); !ok {
+				st.EhEnabled = true
+			} else {
+				st.EhEnabled = raw
 			}
 			if saved.BookWalker.DownloadURL != "" {
 				st.BookWalker.DownloadURL = saved.BookWalker.DownloadURL
@@ -369,6 +376,9 @@ func (st Settings) ApplyPatch(body json.RawMessage) (Settings, error) {
 	}
 	if b, ok := getBool("mangaDexEnabled"); ok {
 		cp.MangaDexEnabled = b
+	}
+	if b, ok := getBool("ehEnabled"); ok {
+		cp.EhEnabled = b
 	}
 	if raw, ok := patch["bookwalker"]; ok {
 		var b map[string]any

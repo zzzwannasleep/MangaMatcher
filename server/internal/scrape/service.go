@@ -27,7 +27,7 @@ type changeSink struct {
 func (c *changeSink) observe(ch Change) { c.items = append(c.items, ch) }
 
 // Service 单系列刮削编排（v1 Bangumi 主链：搜索 → 匹配 → 元数据 PATCH → 封面上传 → 失败进收藏夹）。
-// v2 扩展：五源回退（BW/Mox/MangaDex/百科）、AI 翻译/补写/识别、刮削状态、纠正匹配、黑白名单。
+// v2 扩展：多源回退（BW/Mox/MangaDex/E-Hentai/百科）、AI 翻译/补写/识别、刮削状态、纠正匹配、黑白名单。
 type Service struct {
 	Komga        *komga.Client
 	Bangumi      *bangumi.Client
@@ -38,21 +38,22 @@ type Service struct {
 	WithCovers   bool // 上传封面（meta+cover = All）
 
 	// ---- v2 扩展 ----
-	AI              *sources.AiClient
-	BW              *sources.BookWalkerIndex
-	Mox             *sources.MoxClient
-	MangaDex        *sources.MangaDexClient
-	Baike           *sources.BaikeClient
-	State           StateWriter // 刮削状态（封面/简介）
-	TranslateSummary bool       // 非中文简介/标题 → AI 翻译
-	AIWriteSummary   bool       // 三源无简介时 AI 补写
-	AIIdentify       bool       // AI 识别作品（回退链第 3 环）
-	AISmartPick      bool       // 多候选时 AI 智能选择
-	BwWriteTags      bool       // BW 类型/题材/阅读方向写入
-	Whitelist        []string   // 版本标记白名单
-	Blacklist        []string   // 版本标记黑名单
+	AI               *sources.AiClient
+	BW               *sources.BookWalkerIndex
+	Mox              *sources.MoxClient
+	EH               *sources.EhClient // E-Hentai 表站（同人志/画集兜底）
+	MangaDex         *sources.MangaDexClient
+	Baike            *sources.BaikeClient
+	State            StateWriter  // 刮削状态（封面/简介）
+	TranslateSummary bool         // 非中文简介/标题 → AI 翻译
+	AIWriteSummary   bool         // 三源无简介时 AI 补写
+	AIIdentify       bool         // AI 识别作品（回退链第 3 环）
+	AISmartPick      bool         // 多候选时 AI 智能选择
+	BwWriteTags      bool         // BW 类型/题材/阅读方向写入
+	Whitelist        []string     // 版本标记白名单
+	Blacklist        []string     // 版本标记黑名单
 	CoverHTTP        *http.Client // 带代理的封面下载客户端（nil=直连）
-	CoverReferer     string     // 封面下载 Referer（BW 用 bookwalker.jp）
+	CoverReferer     string       // 封面下载 Referer（BW 用 bookwalker.jp）
 }
 
 // SeriesResult 单系列刮削结果。
@@ -611,7 +612,7 @@ func (s *Service) updateBookCover(book *komga.BookDto, seriesName, volDisplay st
 	if s.DryRun {
 		sink.observe(Change{Kind: ChangeBookCover, SeriesID: book.SeriesID, BookID: book.ID,
 			Target: "《" + seriesName + "》卷 " + volDisplay,
-			Desc: fmt.Sprintf("将上传卷封面（%d 个候选）", len(orderedURLs))})
+			Desc:   fmt.Sprintf("将上传卷封面（%d 个候选）", len(orderedURLs))})
 		return
 	}
 	for i, u := range orderedURLs {
@@ -650,7 +651,7 @@ func (s *Service) updateBookCover(book *komga.BookDto, seriesName, volDisplay st
 		s.Log.Info(fmt.Sprintf("《%s》卷 %s 封面 (%s, %dKB) 已更新", seriesName, volDisplay, sizeLabel, len(blob)/1024))
 		sink.observe(Change{Kind: ChangeBookCover, SeriesID: book.SeriesID, BookID: book.ID,
 			Target: "《" + seriesName + "》卷 " + volDisplay,
-			Desc: fmt.Sprintf("已上传卷封面（%s，%dKB）", sizeLabel, len(blob)/1024)})
+			Desc:   fmt.Sprintf("已上传卷封面（%s，%dKB）", sizeLabel, len(blob)/1024)})
 		return
 	}
 }

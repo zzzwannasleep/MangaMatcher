@@ -271,7 +271,7 @@ func (s *Server) bangumiClient() *bangumi.Client {
 	return bangumi.New(st.BangumiToken, st.BangumiAPIBase, st.BangumiMinIntervalMs)
 }
 
-// newRunner 任务引擎的 Runner 工厂（应用最新设置：五源客户端 + 代理 + 状态库）。
+// newRunner 任务引擎的 Runner 工厂（应用最新设置：各源客户端 + 代理 + 状态库）。
 func (s *Server) newRunner(dryRun bool) *scrape.Runner {
 	st := s.LoadSettings()
 	collectionName := ""
@@ -289,7 +289,7 @@ func (s *Server) newRunner(dryRun bool) *scrape.Runner {
 		}
 	}
 
-	// ---- 五源客户端 ----
+	// ---- 源客户端 ----
 	sc := scrape.SourceClients{}
 	bgmClient := s.bangumiClient()
 	if coverHTTP != nil {
@@ -320,18 +320,25 @@ func (s *Server) newRunner(dryRun bool) *scrape.Runner {
 			sc.Baike = bk
 		}
 	}
+	if st.EhEnabled {
+		if eh, err := sources.NewEhClient(pc, ehBaseOverride, scrape.SlogLogger{L: s.log}, ehPaceOverrideMs); err == nil {
+			sc.EH = eh
+		} else {
+			s.log.Warn("E-Hentai 客户端创建失败: " + err.Error())
+		}
+	}
 
 	return &scrape.Runner{
-		Komga:          s.komgaClient(),
-		Bangumi:        bgmClient,
-		Log:            s.log,
-		CollectionName: collectionName,
-		DryRun:         dryRun,
-		FetchVolumes:   st.FetchVolumes,
-		WithCovers:     st.WithCovers,
-		Concurrency:    st.Concurrency,
-		MatchType:      st.MatchType,
-		Sources:        sc,
+		Komga:            s.komgaClient(),
+		Bangumi:          bgmClient,
+		Log:              s.log,
+		CollectionName:   collectionName,
+		DryRun:           dryRun,
+		FetchVolumes:     st.FetchVolumes,
+		WithCovers:       st.WithCovers,
+		Concurrency:      st.Concurrency,
+		MatchType:        st.MatchType,
+		Sources:          sc,
 		TranslateSummary: st.AI.TranslateSummary,
 		AIWriteSummary:   st.AI.WriteSummary,
 		AIIdentify:       st.AI.Identify,
@@ -348,15 +355,17 @@ const coverUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (K
 
 // ---- 测试注入点（默认空 = 官方站；集成测试指向 httptest mock）----
 var (
-	moxBaseOverride       = ""
-	moxPaceOverrideMs     = 500
-	mangaDexBaseOverride  = ""
-	baikeBaseOverride     = ""
+	moxBaseOverride      = ""
+	moxPaceOverrideMs    = 500
+	mangaDexBaseOverride = ""
+	baikeBaseOverride    = ""
+	ehBaseOverride       = "https://e-hentai.org" // E-Hentai 表站
+	ehPaceOverrideMs     = 1100                   // 表站节流：≥1s/请求
 )
 
 // SetSourceBaseOverrides 运行时注入源基址（env 种子/自建反代用；空串 = 官方站）。
-// moxPaceMs<=0 时用默认 500。
-func SetSourceBaseOverrides(moxBase, mangaDexBase, baikeBase string, moxPaceMs int) {
+// moxPaceMs<=0 时用默认 500；ehPaceMs<=0 时用默认 1100。
+func SetSourceBaseOverrides(moxBase, mangaDexBase, baikeBase, ehBase string, moxPaceMs, ehPaceMs int) {
 	if moxBase != "" {
 		moxBaseOverride = moxBase
 	}
@@ -366,8 +375,14 @@ func SetSourceBaseOverrides(moxBase, mangaDexBase, baikeBase string, moxPaceMs i
 	if baikeBase != "" {
 		baikeBaseOverride = baikeBase
 	}
+	if ehBase != "" {
+		ehBaseOverride = ehBase
+	}
 	if moxPaceMs > 0 {
 		moxPaceOverrideMs = moxPaceMs
+	}
+	if ehPaceMs > 0 {
+		ehPaceOverrideMs = ehPaceMs
 	}
 }
 

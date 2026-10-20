@@ -155,3 +155,46 @@ Bangumi精确 → BookWalker索引 → AI识别(拿不到时问AI作品名 jp/cn
 - 后端：`go vet ./...` + `go test ./... -count=1` 全绿，新测试覆盖：五源各自解析、回退链顺序（Bangumi 空时逐级回退到百科命中）、AI 缓存命中、Mox 520 退避、BW 跨源补空+防串卷、跳过已刮零请求、override 语义、编辑器只提交改动字段、Mylar zip 字节有效、打标 dry-run、状态筛选。
 - 前端：`npm run build` 双绿。
 - Lead 集成：浏览器实测纠正匹配 Modal、编辑器、设置新分区、/manual、覆盖匹配全链路（node mocks + go server）。
+
+## 13. E-Hentai（表站）元数据源
+
+- **只接表站** `https://e-hentai.org`（免登录）：不接里站 exhentai/lilith，不发任何 cookie。`exhentai.org` 全仓只出现在三处**字符串匹配**（链接解析、来源链接识别、封面下载 Referer 判定），不是请求目标。
+- 客户端 `server/internal/sources/ehentai.go`，源标签 `EhSource = "EH"`：
+  - 搜索 `GET {base}/?f_search=…&advsearch=1&f_sfu=on&f_sft=on&f_sfl=on`（行内 `<div class="glink">` + 缩略图）
+  - 元数据 `POST {base}/api.php` `{"method":"gdata","gidlist":[[gid,token]],"namespace":1}` → `gmetadata[0]`；`filesize/rating/filecount` 兼容「字符串」和「裸数字」两种形态
+  - 非默认 base 时 gdata 走 `{base}/api.php`；默认 base 走 `https://api.e-hentai.org/api.php`
+  - id 形状 `gid/token`（`sources.EhID`）；只给 gid 时 `GET {base}/g/{gid}/` 从规范链接补 token，补不出则明确报错（不静默成功）
+  - 节流 1100ms/请求、超时 15s；瞬态状态（429/5xx）重试 3 次（1.5s/3s 退避），连接层错误不重试
+  - **熔断（按 HTTP 层失败计）**：连接失败**或**瞬态状态重试 3 次耗尽 → 各计一次失败，连续 2 次 → 该客户端实例熔断 3 分钟（错误串含「熔断」），期间所有 EH 请求立即失败、链继续走下一源；gdata 逻辑错误（画廊已删除/无元数据）**不算**失败（站点是通的）。动机：一次 500 会让每个系列白等 ~14s，熔断后每 3 分钟只付一次。
+- **链路位置**：Bangumi → BW → AI → Mox → MangaDex → **EH（第 7 步）** → 百科 → 待手动匹配。EH 挂掉（500/超时/连不上）不影响整链：任务仍 `done`，条目落 `manual`。
+- **标签**：EhTagTranslation 词库（`db.text.json`）中文翻译；**上限 12 条**（唯一定义 `scrape.EhTagLimit`），按命名空间优先级 `artist>group>parody>character>female>male>mixed>other>language>category` 取满即止；未收录的 tag 回落原始名（命名空间仍译中文）；`language:chinese` 另外写 `language=zh`，不占 12 条额度；库里已有标签不算额度也不被删。
+- **作者**：`artist`/`group` 标签 → **book 级** `authors`（`role=Artist`，画师在前、社团在后，最多 6 个）；series 级 PATCH **不含** `authors` 字段。
+- 其余字段：`posted`(unix 秒) → `releaseDate`（YYYY-MM-DD，UTC）；`title_jpn` → `alternateTitles[{label:"原名"}]`；画廊页 → `links[{label:"EH", url:…}]`；缩略图 → 系列封面（`updateSeriesCover`）。
+- 尊重 `tagsLock`：锁定系列不写 EH 标签，但仍追加 `MACHINE` 打标。
+- 环境变量（非持久化，调试/演示用）：`EH_API_BASE`（默认官方表站）、`EH_PACE_MS`（0/空 = 默认 1100ms，>0 覆盖，例如 `EH_PACE_MS=50`）。两个都只在**进程启动时读一次**，不走设置页。
+- 本地联调（不翻墙、不配代理）：`node tools/mock-ehentai.js` → 默认 :25693，启动时打印端口与接入命令；再接 `EH_API_BASE=http://127.0.0.1:25693`（想快点就加 `EH_PACE_MS=50`）起后端即可跑通候选/详情/应用/刮削整条链。（§10 的 mock 清单尚未收录本文件。）
+- 验证：`server/internal/api/v2_eh_test.go` —— 候选 wire / 详情映射 / 12 条上限与优先级 / 书级作者 / dry-run 零写 / tagsLock / 失败即继续，以及空 tags、空 title、只有 gid、gdata error、filesize 裸数字等对抗边界；全部指向本地假站，零出网。
+
+### 13.1 命中率实测（2026-10-20，真站 + 代理）
+
+**EH 的 `f_search` 是罗马字取向的：日文/中文标题词基本搜不到。**
+
+| 查询 | 结果 |
+|---|---|
+| `f_search=mesu kyoushi` | 25 条命中 |
+| `f_search="mesu kyoushi 3"` | 10 条命中（短语匹配有效） |
+| `f_search=雌教師`（CJK） | **0 条**（页面是正常的 "No hits found"，不是解析失败） |
+| `f_search=artist:asanagi` | 全是该画师作品（标签语法精确） |
+
+用真实本子文件夹名跑完整策略（3 个样本）的结果：
+
+- `[MTSP (Jin)] 橘さん家ノ男性事情 [中国翻訳]` → **命中**（精确匹配，`artist:Jin` 也命中）；同作品在 EH 有多个版本（合集/单话/AI 生成），命中的可能是其中一个章节版本。默认流程只补标签/作者/日期/链接、不改标题，所以实际影响很小；开了「覆盖标题」才会把章节标题写进去。
+- `[朝凪] 雌教師3 (アズールレーン) [DL版]` → **不命中**：日文标题词 0 命中；`朝凪` 作为文本词只搜到同名角色（如 "Umi Asanagi"）；`artist:朝凪` 也是 0 条，因为 **EH 的标签是罗马字**（该画师在 EH 叫 `asanagi`）。
+- `[Fatalpulse (朝凪)] 淫らな制服 [中国翻訳]` → **不命中**：同上（`淫らな制服` 0 命中、`artist:` 用 CJK 名 0 命中）。
+
+**结论与用法**：
+
+1. 文件夹里带**罗马字**画师/社团名（`[Fatalpulse (Asanagi)] Mesu Kyoushi 3 [Chinese]`）或罗马字标题时，EH 命中率高；纯 CJK 命名的本子大概率匹配不上，随后按链路落到「待手动匹配」。
+2. 匹配不上**不会写错数据**（保守策略：短词/低相似度一律拒绝），只是没刮到。
+3. 这类本子的正确用法是**贴画廊链接**：纠正匹配 → 粘贴 `https://e-hentai.org/g/<gid>/<token>/` → 解析预览（中文标签 + 12 条上限）→ 应用。这条路径与自动匹配写库同源。
+4. `artist:` 标签搜索只在方括号段本身就是罗马字时有效（`ehArtistTag` 不做 CJK→罗马字转换）；CJK 名字会白跑一次请求（无害，受熔断保护）。
