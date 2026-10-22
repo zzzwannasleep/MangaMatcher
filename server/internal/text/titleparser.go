@@ -10,14 +10,30 @@ import (
 // （extractSeriesTitles / extractAndNormalizeTitle / extractVolumeNumber / normalizeDate / capitalize）。
 
 var (
-	reVolNum        = regexp.MustCompile(`(?i)vol(?:ume)?[._\s]*v?(\d{1,4})(?:完|end)?$`)
-	reParenNum      = regexp.MustCompile(`(?i)[（(](\d{1,4})[）)]\s*(?:完)?$`)
-	reTrailingNum   = regexp.MustCompile(`\s(\d{1,4})$`)
-	reChineseVol    = regexp.MustCompile(`(?i)第\s*(\d{1,4})\s*[卷册]\s*(?:完)?$`)
+	reVolNum      = regexp.MustCompile(`(?i)vol(?:ume)?[._\s]*v?(\d{1,4})(?:完|end)?$`)
+	reParenNum    = regexp.MustCompile(`(?i)[（(](\d{1,4})[）)]\s*(?:完)?$`)
+	reTrailingNum = regexp.MustCompile(`\s(\d{1,4})$`)
+	// 卷号字含日文新字体 巻/冊 与 集：Bangumi 单行本大量用 "X (第18巻)"，以前 [卷册] 漏了 巻，
+	// 整批单行本卷号解析不出来 → 静默按列表序号兜底（实测一次任务 252 次）。
+	reChineseVol    = regexp.MustCompile(`(?i)第\s*(\d{1,4})\s*[卷册巻冊集]\s*(?:完)?$`)
 	reVPrefixNum    = regexp.MustCompile(`(?i)(?:^|[^\w/])v[._\s]?(\d{1,4})$`)
 	reParenAnywhere = regexp.MustCompile(`(?i)[（(](\d{1,4})[）)]`)
 	reVolAnywhere   = regexp.MustCompile(`(?i)vol(?:ume)?[._\s]*v?(\d{1,4})`)
-	reCnVolAnywhere = regexp.MustCompile(`(?i)第\s*(\d{1,4})\s*[卷册]`)
+	reCnVolAnywhere = regexp.MustCompile(`(?i)第\s*(\d{1,4})\s*[卷册巻冊集]`)
+
+	// 卷号后跟副标题："100億の男 1 人生を売った男"、"せんごくっ!? 3 悠久乱世恋華譚"
+	reNumWithSubtitle = regexp.MustCompile(`[\s　](\d{1,3})[\s　]+\S+$`)
+	// 卷号后跟任意副标题（含空格）："火之鸟 复刻版 07 乱世篇 上"、"… 01―Silent Mobius"。
+	// 只认 1~2 位数，避免把 "FAIRY TAIL 100 YEARS QUEST" 的 100 当卷号。
+	reNumWithLongSubtitle = regexp.MustCompile(`[\s　](\d{1,2})(?:[\s　]+|[-–—―]+).*$`)
+	// 数字紧跟卷字："ドラえもん 0巻"、"5巻+特典"
+	reVolCharNum = regexp.MustCompile(`[（(]?\s*(\d{1,4})\s*[卷巻冊册集]`)
+	// 英文前缀编号："… FILE1"、"Part.2"、"Lv.3"
+	reFileNum = regexp.MustCompile(`(?i)(?:file|part|disk|disc|chapter|chap|episode|ep|lv)[\s._-]*(\d{1,4})$`)
+	// 罗马数字卷号："コヨーテ I"（要求前面有空白，且整串不能就是那个罗马数字）
+	reRomanNum = regexp.MustCompile(`[\s　]([IVX]{1,4})$`)
+	// 汉字数字卷号："うせもの宿 (一)"
+	reKanjiNumParen = regexp.MustCompile(`[（(]\s*([一二三四五六七八九十]+)\s*[）)]$`)
 
 	// VolumeTitleRegex 书名卷号模式（用于批量匹配中的卷识别）。
 	VolumeTitleRegex = regexp.MustCompile(`(?i)(?:vol(?:ume)?s?|巻|卷|册|冊)[\W_]*?(?P<volNum>\d+)|第\s*(?P<volNum2>\d+)\s*(?:巻|卷|册|冊|集)|(?P<volNum3>\d+)\s*(?:巻|卷|册|冊|集)`)
@@ -25,8 +41,9 @@ var (
 	reCopySuffixCn  = regexp.MustCompile(`\s*[-_－—]*\s*副本(?:\s*[（(]\d{1,3}[)）])?$`)
 	reCopySuffixNum = regexp.MustCompile(`\s*[（(]\d{1,3}[)）]$`)
 
-	rePunctNorm  = regexp.MustCompile(`[:：•·․,，。、'’?？!！~⁓～]`)
-	rePunctClean = regexp.MustCompile(`[:：•·․,，。'’?？!！~⁓～]`)
+	rePunctNorm  = regexp.MustCompile(`[:：•·․,，。、'’?？!！~⁓～〜]`)
+	rePunctClean = regexp.MustCompile(`[:：•·․,，。'’?？!！~⁓～〜]`)
+	reSpaces     = regexp.MustCompile(`\s+`)
 
 	reDateCnFull = regexp.MustCompile(`^(\d{4})年(\d{1,2})月(\d{1,2})日$`)
 	reDateCnMon  = regexp.MustCompile(`^(\d{4})年(\d{1,2})月$`)
@@ -37,14 +54,19 @@ var (
 	reMinJingWai = regexp.MustCompile(`[\(\[【（]?境外版[\)\]】）]?\s*`)
 	reMinDan     = regexp.MustCompile(`[\(\[【（]?单行本[\)\]】）]?\s*$`)
 	// reMinJuan 兼容「[全3卷]」「（全12卷）」「N卷」尾巴（上游 C# 会把 "[全3卷]" 剥成 "[全" 留下孤字"全"——已修）
-	reMinJuan = regexp.MustCompile(`[\(\[【（]?(?:全)?\d+卷[\)\]】）]?\s*$`)
+	reMinJuan    = regexp.MustCompile(`[\(\[【（]?(?:全)?\d+卷[\)\]】）]?\s*$`)
 	reMinBracket = regexp.MustCompile(`\[[^\[\]]*\]`)
-	reMinHei     = regexp.MustCompile(`【.*?】`)
+	reMinHei     = regexp.MustCompile(`【([^【】]*)】`)
 	reMinParen   = regexp.MustCompile(`[（()）]`)
 	reMinTail    = regexp.MustCompile(`[_-]?\s*$`)
+	// 版本/合辑/来源后缀（"铳梦 完全版"、"七龙珠港版完全版"、"RE-TAKE全年龄版"）
+	reMinIchiban   = regexp.MustCompile(`[（(]?\s*一般コミック\s*[）)]?`)
+	reMinAllVol    = regexp.MustCompile(`全\s*\d+\s*[卷巻冊册]`)
+	reMinPlusTail  = regexp.MustCompile(`\s+[+＋].*$`)
+	reMinHeadSplit = regexp.MustCompile(`^(.{3,40}?)\s*[-–—~～:：]`)
 
-	// 纯卷号/卷数区间：25、第12卷、3完、38全、全3卷、全3、Vol.01、Vol.01-Vol.18、1-100完
-	reBoilerplateVol = regexp.MustCompile(`(?i)^(?:第)?(?:全)?\d+(?:[-~～]\d+)?[卷话話册集完全]?$|^vol\.?\s*\d+(?:\s*[-~～]\s*(?:vol\.?\s*)?\d+)?$`)
+	// 纯卷号/卷数区间：25、第12卷、3完、38全、全3卷、全3、Vol.01、Vol.01-Vol.18、1-100完、全一册
+	reBoilerplateVol = regexp.MustCompile(`(?i)^(?:第)?(?:全)?\d+(?:[-~～]\d+)?[卷话話册集完全]?$|^vol\.?\s*\d+(?:\s*[-~～]\s*(?:vol\.?\s*)?\d+)?$|^全\s*[一二三四五六七八九十\d]+\s*[卷巻册冊集]$`)
 )
 
 // ExtractVolumeNumber 书名/文件名 → 卷号（Vol.x / Vol_x / (x) / （x） / 尾数字 / 第x卷 / v01）。
@@ -52,11 +74,36 @@ func ExtractVolumeNumber(name string) (int, bool) {
 	if strings.TrimSpace(name) == "" {
 		return 0, false
 	}
-	for _, re := range []*regexp.Regexp{reVolNum, reParenNum, reChineseVol, reVPrefixNum, reTrailingNum} {
+	for _, re := range []*regexp.Regexp{reVolNum, reParenNum, reChineseVol, reVPrefixNum, reFileNum, reTrailingNum} {
 		if m := re.FindStringSubmatch(name); m != nil {
 			if n, err := strconv.Atoi(m[1]); err == nil {
 				return n, true
 			}
+		}
+	}
+	if m := reKanjiNumParen.FindStringSubmatch(name); m != nil {
+		if n, ok := kanjiNumToInt(m[1]); ok {
+			return n, true
+		}
+	}
+	if m := reRomanNum.FindStringSubmatch(name); m != nil && len([]rune(name)) > len(m[1])+1 {
+		if n, ok := romanNumToInt(m[1]); ok {
+			return n, true
+		}
+	}
+	if m := reNumWithSubtitle.FindStringSubmatch(name); m != nil {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			return n, true
+		}
+	}
+	if m := reNumWithLongSubtitle.FindStringSubmatch(name); m != nil {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			return n, true
+		}
+	}
+	if m := reVolCharNum.FindStringSubmatch(name); m != nil {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			return n, true
 		}
 	}
 	// 非行尾兜底：卷号不在结尾（"乱马 Vol.01 [东立]"）→ 取串中最后一次出现的卷号模式。
@@ -77,6 +124,68 @@ func ExtractVolumeNumber(name string) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// kanjiNumToInt 汉字数字 → 阿拉伯数字（一~九十九）；解析不出返回 false。
+func kanjiNumToInt(s string) (int, bool) {
+	if s == "" {
+		return 0, false
+	}
+	digits := map[rune]int{'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+	r := []rune(s)
+	if s == "十" {
+		return 10, true
+	}
+	ten := strings.Index(s, "十")
+	if ten < 0 {
+		if len(r) == 1 {
+			if d, ok := digits[r[0]]; ok {
+				return d, true
+			}
+		}
+		return 0, false
+	}
+	tens := 1
+	if ten > 0 {
+		d, ok := digits[r[0]]
+		if !ok {
+			return 0, false
+		}
+		tens = d
+	}
+	if ten == len(r)-1 {
+		return tens * 10, true
+	}
+	ones, ok := digits[r[len(r)-1]]
+	if !ok {
+		return 0, false
+	}
+	return tens*10 + ones, true
+}
+
+// romanNumToInt 罗马数字 → 阿拉伯数字（1~30）；非法或超范围返回 false。
+func romanNumToInt(s string) (int, bool) {
+	vals := map[rune]int{'I': 1, 'V': 5, 'X': 10}
+	total, prev := 0, 0
+	r := []rune(s)
+	for i := len(r) - 1; i >= 0; i-- {
+		v, ok := vals[r[i]]
+		if !ok {
+			return 0, false
+		}
+		if v < prev {
+			total -= v
+		} else {
+			total += v
+		}
+		if v > prev {
+			prev = v
+		}
+	}
+	if total < 1 || total > 30 {
+		return 0, false
+	}
+	return total, true
 }
 
 // ExtractBookVolumeNumber Komga 书 → 卷号：书名/元数据标题里的卷号模式 → 元数据 number 字段 → 0。
@@ -197,8 +306,9 @@ func ExtractAndNormalizeTitle(str string) string {
 		title = candidates[0]
 	}
 	title = T2S(title)
-	// 标点替换成空格后保留（对齐脚本，不显式去空白）
-	return strings.ToLower(strings.Trim(rePunctNorm.ReplaceAllString(title, " "), " "))
+	// 去「全部」空白：以前只 Trim，于是 "FAIRY TAIL  ZERO"（双空格，来自标点换空格）
+	// 与候选 "FAIRY TAIL ZERO" 永远不相等 —— 实测日志里 FAIRY TAIL ZERO / Gimmick! 特技化裝 就是这么漏的。
+	return reSpaces.ReplaceAllString(strings.ToLower(rePunctNorm.ReplaceAllString(title, " ")), "")
 }
 
 // NormalizeForMatch 轻量规范化（不去空白、不小写），仅用于显示层预处理。
@@ -217,6 +327,8 @@ var BoilerplateMarkers = []string{
 var PublisherTitleMarkers = []string{
 	"东立", "台湾角川", "角川", "青文", "长鸿", "大然", "尖端", "玉皇朝",
 	"文化传信", "文传", "文苑", "电子版", "bili", "zzgundam", "汉化组",
+	// 实测漏网（日志里出现 "词=东贩" 这种搜索词）：东贩/天下/时报/尚禾 等港台出版社
+	"东贩", "天下", "时报", "尚禾", "大辣", "东贩出版", "集英社", "讲谈社", "小学馆", "白泉社",
 }
 
 // IsBoilerplateSegment 是否元信息段（不当搜索词）。
@@ -372,10 +484,12 @@ func ExtractSeriesTitles(input string, limitCount int) []string {
 		finalTitles = append(finalTitles, t)
 	}
 
-	minimalProcessedTitle := MinimalProcessTitle(input)
+	minimalProcessedTitle := MinimalProcessTitle(T2S(input))
 	if !IsBoilerplateSegment(minimalProcessedTitle) { // 剥完 [] 剩下的 "38全" 之类不当搜索词
 		push(minimalProcessedTitle)
 	}
+	// 长副标题截断：「Fate Grand Order-Epic of Remnant-亞種特異點III …」→ 再补一个主标题候选
+	push(MainTitleHead(minimalProcessedTitle))
 	for _, t := range bracketTitles {
 		push(t)
 	}
@@ -399,21 +513,32 @@ func ExtractSeriesTitles(input string, limitCount int) []string {
 	return final
 }
 
-// sortCandidates 稳定排序：先无假名，再拉丁占比升序（对齐 C# OrderBy().ThenBy() 稳定语义）。
+// sortCandidates 稳定排序：先无假名，再长段优先（标题通常比 [作者]/[出版社] 段长），最后拉丁占比升序。
+// 以前第二关键字是拉丁占比升序 —— 纯汉字作者名（0.0）会被排到混排标题（如 AKABOSHI異聞水滸傳）前面，
+// 白打一次搜索。
 func sortCandidates(list []string) {
 	type kv struct {
 		s     string
 		kana  bool
 		latin float64
+		n     int
 	}
 	items := make([]kv, len(list))
 	for i, s := range list {
-		items[i] = kv{s, hasKana(s), latinRatio(s)}
+		items[i] = kv{s, hasKana(s), latinRatio(s), len([]rune(s))}
 	}
 	// 插入排序保持稳定性，元素数量小
+	less := func(a, b kv) bool {
+		if a.kana != b.kana {
+			return !a.kana // 无假名的排前
+		}
+		if a.n != b.n {
+			return a.n > b.n // 长段优先
+		}
+		return a.latin < b.latin
+	}
 	for i := 1; i < len(items); i++ {
-		for j := i; j > 0 && (items[j].kana && !items[j-1].kana ||
-			(items[j].kana == items[j-1].kana && items[j].latin < items[j-1].latin)); j-- {
+		for j := i; j > 0 && less(items[j], items[j-1]); j-- {
 			items[j], items[j-1] = items[j-1], items[j]
 		}
 	}
@@ -480,7 +605,26 @@ func ExtractBracketParts(input string) []string {
 }
 
 func cleanCandidate(t string) string {
-	return strings.Trim(rePunctClean.ReplaceAllString(t, " "), " ")
+	// 标点换空格后要把连续空白压成一个：搜索词里的双空格会让 Bangumi 搜不到
+	//（实测 "FAIRY TAIL  ZERO" / "战国    悠久乱世恋华谭"）。
+	return strings.Trim(reSpaces.ReplaceAllString(rePunctClean.ReplaceAllString(t, " "), " "), " ")
+}
+
+// MainTitleHead 长标题截断：从第一个分隔符（- ~ ：）截出主标题；太短/无分隔符/截不出内容返回空串。
+func MainTitleHead(title string) string {
+	t := strings.TrimSpace(title)
+	if len([]rune(t)) < 12 {
+		return ""
+	}
+	m := reMinHeadSplit.FindStringSubmatch(t)
+	if m == nil {
+		return ""
+	}
+	head := cleanCandidate(strings.TrimSpace(m[1]))
+	if len([]rune(head)) < 3 || len([]rune(head)) >= len([]rune(t)) {
+		return ""
+	}
+	return head
 }
 
 // latinRatio 拉丁字母占「字母+汉字+假名」的比例；纯符号/数字返回 0.5。
@@ -513,23 +657,49 @@ func hasKana(s string) bool {
 	return false
 }
 
-// MinimalProcessTitle 最小处理标题：去 [境外版]/[单行本]/N卷/[]/【】、括号转空格、尾部标点。
+// MinimalProcessTitle 最小处理标题：去 [境外版]/[单行本]/N卷/[]、括号转空格、剥版本后缀、尾部标点。
 func MinimalProcessTitle(input string) string {
 	s := reMinJingWai.ReplaceAllString(input, "")
 	s = reMinDan.ReplaceAllString(s, "")
 	s = reMinJuan.ReplaceAllString(s, "")
+	// 【】以前整段删掉 —— 对「名字被书名号包着」的标题（Bangumi 的 【推しの子】/【我推的孩子】、
+	// 用户文件夹 "【作品名】"）会把名字一起删光：归一化结果变空串，与任何候选都不相等，
+	// 搜索词也变空（直接报"无法从标题解析搜索词"）。现在只删「注释型」【】
+	//（含数字或完整度/汉化等元信息词，如 【已完结】【1-2卷全是中文】），名字型的只去括号保留内容。
+	s = reMinHei.ReplaceAllStringFunc(s, func(m string) string {
+		inner := strings.TrimSpace(reMinHei.FindStringSubmatch(m)[1])
+		if inner == "" || IsBoilerplateSegment(inner) || strings.ContainsAny(inner, "0123456789") {
+			return " "
+		}
+		return " " + inner + " "
+	})
 	// 循环剥最内层 []（嵌套 "[Fate/stay night [UBW]]" 只剥一层会留下垃圾 "]"）
 	for reMinBracket.MatchString(s) {
 		s = reMinBracket.ReplaceAllString(s, "")
 	}
 	s = strings.ReplaceAll(s, "[", "")
 	s = strings.ReplaceAll(s, "]", "")
-	s = reMinHei.ReplaceAllString(s, "")
 	s = reMinParen.ReplaceAllString(s, " ")
+	// 版本/合辑/来源后缀：完全版、港版、爱藏版、全年龄版、一般コミック、全N卷、+特典+…
+	s = reMinIchiban.ReplaceAllString(s, " ")
+	s = reMinAllVol.ReplaceAllString(s, " ")
+	// 只剥「空白 + 加号」开头的附加卷尾；C100+C104 这种没空格的不能碰
+	s = reMinPlusTail.ReplaceAllString(s, " ")
+	for _, marker := range VersionSuffixMarkers {
+		s = strings.ReplaceAll(s, marker, " ")
+	}
 	s = reMinTail.ReplaceAllString(s, "")
 	s = strings.TrimSpace(s)
 	// 标点清洗（与 finalTitles 一致）
 	s = rePunctClean.ReplaceAllString(s, " ")
 	s = strings.ReplaceAll(s, "／", "/")
+	s = reSpaces.ReplaceAllString(s, " ")
 	return strings.Trim(s, " ")
+}
+
+// VersionSuffixMarkers 版本/装帧/来源后缀词（当搜索词会搜不到，如「铳梦 完全版」）。
+var VersionSuffixMarkers = []string{
+	"完全版", "愛藏版", "爱藏版", "新装版", "新裝版", "典藏版", "豪華版", "豪华版",
+	"特裝版", "特装版", "文庫版", "文库版", "復刻版", "复刻版", "盒裝版", "盒装版",
+	"港版", "台版", "全年龄版", "全年齢版", "电子版", "電子版",
 }

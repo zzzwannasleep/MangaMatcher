@@ -18,6 +18,9 @@ type ManualMatchCollection struct {
 	mu        sync.Mutex
 	colID     string
 	memberIDs []string
+	// missingChecked 已确认「当前不存在」→ initialSeriesID 为空的调用直接短路，
+	// 不再每个成功系列都全量拉一次 collections（桌面版实测一次任务打了 1036 次）。
+	missingChecked bool
 }
 
 // NewManualMatchCollection 创建管理器。
@@ -39,22 +42,28 @@ func (m *ManualMatchCollection) ensureExistsLocked(initialSeriesID string) bool 
 	if m.colID != "" {
 		return true
 	}
+	if initialSeriesID == "" && m.missingChecked {
+		return false
+	}
 	collections, err := m.komga.GetCollections()
 	if err != nil {
 		m.log.Error("[收藏夹] 操作 " + m.Name + " 失败: " + err.Error())
 		m.colID = ""
 		m.memberIDs = nil
+		m.missingChecked = false // 出错不算「确认不存在」，下次还要再试
 		return false
 	}
 	for _, c := range collections {
 		if c.Name == m.Name {
 			m.colID = c.ID
 			m.memberIDs = c.SeriesIds
+			m.missingChecked = false
 			m.log.Info("[收藏夹] 已找到 \"" + m.Name + "\" (ID:" + m.colID + ")，包含 " + strconv.Itoa(len(m.memberIDs)) + " 个系列")
 			return true
 		}
 	}
 	if initialSeriesID == "" {
+		m.missingChecked = true
 		m.log.Info("[收藏夹] \"" + m.Name + "\" 不存在，将等失败系列出现时创建")
 		return false
 	}
@@ -63,6 +72,7 @@ func (m *ManualMatchCollection) ensureExistsLocked(initialSeriesID string) bool 
 		m.log.Error("[收藏夹] 创建 \"" + m.Name + "\" 失败: " + err.Error())
 		return false
 	}
+	m.missingChecked = false
 	m.colID = created.ID
 	m.memberIDs = created.SeriesIds
 	if len(m.memberIDs) == 0 {

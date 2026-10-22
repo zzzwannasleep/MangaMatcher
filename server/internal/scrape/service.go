@@ -379,6 +379,31 @@ func (s *Service) fetchVolumeMatesWithNeed(subjectID int, books []komga.BookDto,
 		return nil, nil
 	}
 
+	// 解析不出卷号的单行本：以前直接拿「排序后的列表序号」当卷号 —— 未解析的都被排到末尾，
+	// 序号会落进已解析卷号的区间里撞车（实测一次任务 252 次兜底）→ 封面/简介静默挂到错误的册。
+	// 现在按「最小未占用卷号」补齐，保证与已解析卷号不冲突。
+	parsedNums := make([]int, len(volumes))
+	parsedOK := make([]bool, len(volumes))
+	used := map[int]bool{}
+	for i, v := range volumes {
+		if n, ok := volNumOf(v); ok {
+			parsedNums[i], parsedOK[i] = n, true
+			used[n] = true
+		}
+	}
+	fallback := make([]int, len(volumes))
+	nextFree := 1
+	for i := range volumes {
+		if parsedOK[i] {
+			continue
+		}
+		for used[nextFree] {
+			nextFree++
+		}
+		fallback[i] = nextFree
+		used[nextFree] = true
+	}
+
 	mates := make([]bangumi.VolumeMate, 0, len(volumes))
 	for idx, vol := range volumes {
 		var coverURLs []string
@@ -392,10 +417,10 @@ func (s *Service) fetchVolumeMatesWithNeed(subjectID int, books []komga.BookDto,
 				}
 			}
 		}
-		num, ok := volNumOf(vol)
-		if !ok {
-			num = idx + 1
-			s.Log.Warn("Bangumi 单行本《" + effName(vol) + "》解析不出卷号，按列表序号 " + strconv.Itoa(idx+1) + " 处理")
+		num := parsedNums[idx]
+		if !parsedOK[idx] {
+			num = fallback[idx]
+			s.Log.Warn("Bangumi 单行本《" + effName(vol) + "》解析不出卷号，按未占用卷号 " + strconv.Itoa(num) + " 处理（避免与已解析卷号冲突）")
 		}
 		mate := bangumi.VolumeMate{Num: strconv.Itoa(num), CoverURLs: coverURLs}
 		if needUpdate[num] && s.FetchVolumes {

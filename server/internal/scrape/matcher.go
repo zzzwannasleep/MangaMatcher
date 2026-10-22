@@ -58,7 +58,33 @@ func FindPreciseMatch(list []bangumi.SearchCandidate, searchNorm string) *bangum
 		}
 	}
 
-	// 反向包含：候选名比搜索词长（带副标题/版本名）。
+	// 反向包含：候选名比搜索词长（带副标题/版本名/英文原名），如词 "家庭教师" ↔ 候选
+	// "家庭教師ヒットマンREBORN!"（归一化后 "家庭教师ヒットマンreborn"）。
+	// ① 前缀匹配：门槛以前是 6，中文 2~5 字的完整标题永远走不到这里
+	//    （实测一次任务 66/180 条失败卡在这：家庭教师/我推的孩子/赌博启示录/迷宫干/LIFE…）。
+	//    放宽的同时加两道约束防张冠李戴：候选名必须以搜索词「开头」，且取最短的那个候选。
+	if len([]rune(searchNorm)) >= 3 {
+		var best *bangumi.SearchCandidate
+		bestLen := -1
+		for i := range list {
+			for _, cand := range candidateNames(list[i]) {
+				n := text.ExtractAndNormalizeTitle(cand)
+				nr := []rune(n)
+				if len(nr) <= len([]rune(searchNorm)) || !strings.HasPrefix(n, searchNorm) {
+					continue
+				}
+				if best == nil || len(nr) < bestLen {
+					best = &list[i]
+					bestLen = len(nr)
+				}
+			}
+		}
+		if best != nil {
+			return best
+		}
+	}
+
+	// ② 原来的「包含即可」（不要求开头）只在 >=6 时保留，避免放宽后把短词配到不相干的候选上。
 	if len([]rune(searchNorm)) >= 6 {
 		for i := range list {
 			for _, cand := range candidateNames(list[i]) {

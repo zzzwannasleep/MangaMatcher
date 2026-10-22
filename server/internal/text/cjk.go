@@ -10,12 +10,24 @@ var (
 	s2tMap = map[rune]rune{}
 )
 
+// extraT2S 补充映射：内置单字表（cjkdata.go，自动生成，勿手改）缺的常用繁体字。
+// 桌面版走 OpenCC 不受影响，Go 侧只有这张表，缺字会让标题匹配不上 —— 实测日志里
+// 「铳梦 完全版」（Bangumi 叫 銃夢）与「[AKABOSHI異聞水滸傳]」都因为这两个字漏了而无法归一化相等。
+var extraT2S = map[rune]rune{
+	'銃': '铳',
+	'滸': '浒',
+}
+
 func init() {
 	simp := []rune(jt2ft)
 	trad := []rune(ft2jt)
 	for i := 0; i < len(simp) && i < len(trad); i++ {
 		t2sMap[trad[i]] = simp[i]
 		s2tMap[simp[i]] = trad[i]
+	}
+	for t, s := range extraT2S {
+		t2sMap[t] = s
+		s2tMap[s] = t
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -98,17 +99,40 @@ func NewBaikeClient(baseURL string) (*BaikeClient, error) {
 }
 
 type baikeResp struct {
-	ID         int64  `json:"id"`
-	NewLemmaID int64  `json:"newLemmaId"`
-	Title      string `json:"title"`
-	Desc       string `json:"desc"`
-	Abstract   string `json:"abstract"`
-	Image      string `json:"image"`
-	URL        string `json:"url"`
+	ID         flexInt64 `json:"id"`
+	NewLemmaID flexInt64 `json:"newLemmaId"`
+	Title      string    `json:"title"`
+	Desc       string    `json:"desc"`
+	Abstract   string    `json:"abstract"`
+	Image      string    `json:"image"`
+	URL        string    `json:"url"`
 	Card       []struct {
 		Name  string   `json:"name"`
 		Value []string `json:"value"`
 	} `json:"card"`
+}
+
+// flexInt64 百科 id / newLemmaId 有时回数字、有时回字符串（甚至空串）—— 宽容解析。
+// 实测报错：`json: cannot unmarshal string into Go struct field ... of type int64`，
+// 字段类型不匹配会让整条百科兜底源解析失败（一次任务 3 个系列因此失去兜底）。
+type flexInt64 int64
+
+func (f *flexInt64) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(strings.TrimSpace(string(b)), `"`)
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	if v, err := strconv.ParseInt(s, 10, 64); err == nil {
+		*f = flexInt64(v)
+		return nil
+	}
+	if v, err := strconv.ParseFloat(s, 64); err == nil {
+		*f = flexInt64(int64(v))
+		return nil
+	}
+	*f = 0 // 其他形态不炸整条解析
+	return nil
 }
 
 // SearchCard 按关键词取词条卡片；未命中返回 nil，网络错误抛出。
@@ -147,7 +171,7 @@ func (c *BaikeClient) SearchCard(ctx context.Context, keyword string) (*BaikeCar
 	}
 	// 注意：不做 T2S —— 百科正文是简体，但「原版名称/作画」等卡片值是日文原文，原样保留
 	card := &BaikeCard{
-		LemmaID:  r.NewLemmaID,
+		LemmaID:  int64(r.NewLemmaID),
 		Title:    title,
 		Desc:     strings.TrimSpace(r.Desc),
 		Abstract: strings.TrimSpace(r.Abstract),
