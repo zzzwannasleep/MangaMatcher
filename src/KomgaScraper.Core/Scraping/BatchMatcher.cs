@@ -402,6 +402,33 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
         var oriTitle = forceRematch ? series.Name.Trim() : series.Metadata?.Title?.Trim() ?? series.Name.Trim();
         var result = new BatchMatchResult { SeriesId = series.Id, Name = oriTitle };
 
+        // 失败收口：所有失败出口都必须走这里，否则失败系列不会进「手动匹配」收藏夹。
+        // 历史 bug：无精确匹配 / 解析不出搜索词 / 精确匹配后刮削失败 这三条 return 写在 try 里直接返回，
+        // 绕过了方法末尾的收藏夹分支 → 实测一次任务 182 个失败系列一个都没进收藏夹（日志「已加入」0 次，
+        // 「已使用系列…创建」0 次），用户在 Komga 侧完全看不到失败清单。
+        async Task<BatchMatchResult> FailAsync(string? error)
+        {
+            var failed = result with { Error = error };
+            if (stats == null || forceRematch) return failed;   // 覆盖匹配不进收藏夹：旧数据还挂着，保持原样
+            if (DryRun)
+            {
+                log.Info($"[Dry-run] 将把《{result.Name}》加入\"手动匹配\"收藏夹");
+                _scrape.EmitChange(new ScrapeChange(
+                    ScrapeChangeKind.Collection, series.Id, $"《{result.Name}》",
+                    "将加入\"手动匹配\"收藏夹"));
+                return failed;
+            }
+            var added = await _manualMatch.AddSeriesAsync(series.Id, result.Name, ct);
+            if (added)
+            {
+                lock (stats) stats.AddedToCollectionCount++;
+                _scrape.EmitChange(new ScrapeChange(
+                    ScrapeChangeKind.Collection, series.Id, $"《{result.Name}》",
+                    "已加入\"手动匹配\"收藏夹"));
+            }
+            return failed;
+        }
+
         try
         {
             // 列表接口（POST /series/list）本来就带完整元数据（含 links/全部锁字段），
@@ -449,7 +476,7 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
             var terms = TitleParser.ExtractSeriesTitles(seriesName, 4);
             if (terms.Count == 0 || string.IsNullOrEmpty(terms[0]))
             {
-                return result with { Error = "无法从标题解析搜索词" };
+                return await FailAsync("无法从标题解析搜索词");
             }
             var searchTerm = terms[0];
 
@@ -838,7 +865,7 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
 
                 var err = searchResults.Count > 0 ? "无精确匹配（标题/原名/别名）" : "搜索无结果";
                 log.Warn($"《{seriesName}》(词:\"{searchTerm}\") {err}");
-                return result with { Error = err };
+                return await FailAsync(err);
             }
 
             var display = FirstNonEmpty(precise.Title, precise.OriTitle, "未知匹配标题");
@@ -846,7 +873,7 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
             var scrapeResult = await _scrape.ScrapeAsync(series.Id, precise.Id,
                 Opts(syncType, forceRematch), series, komgaMeta, ct);
             if (!scrapeResult.Success)
-                return result with { Error = scrapeResult.Error };
+                return await FailAsync(scrapeResult.Error);
             return result with { Success = true, MatchedTitle = display };
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -855,37 +882,13 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
             // 超时/连接中止也抛 TaskCanceledException（如 HttpClient.Timeout 到点）——
             // 它不是用户取消，绝不能让它杀掉整批（历史上整批 30 分钟的成果一次 100s 超时全灭）。
             log.Error($"《{result.Name}》请求超时/被中止（非手动取消），该系列按失败处理，批次继续: {oce.Message}");
-            result = result with { Error = $"请求超时/中止（非取消）: {oce.Message}" };
+            return await FailAsync($"请求超时/中止（非取消）: {oce.Message}");
         }
         catch (Exception e)
         {
             log.Error($"《{result.Name}》批量匹配出错: {e.Message}");
-            result = result with { Error = e.Message };
+            return await FailAsync(e.Message);
         }
-
-        // 失败 → 手动匹配收藏夹（Dry-run 只提示，不写；覆盖匹配不进收藏夹——旧数据还挂着，保持原样）
-        if (!result.Success && !result.Skipped && stats != null && !forceRematch)
-        {
-            if (DryRun)
-            {
-                log.Info($"[Dry-run] 将把《{result.Name}》加入\"手动匹配\"收藏夹");
-                _scrape.EmitChange(new ScrapeChange(
-                    ScrapeChangeKind.Collection, series.Id, $"《{result.Name}》",
-                    "将加入\"手动匹配\"收藏夹"));
-            }
-            else
-            {
-                var added = await _manualMatch.AddSeriesAsync(series.Id, result.Name, ct);
-                if (added)
-                {
-                    lock (stats) stats.AddedToCollectionCount++;
-                    _scrape.EmitChange(new ScrapeChange(
-                        ScrapeChangeKind.Collection, series.Id, $"《{result.Name}》",
-                        "已加入\"手动匹配\"收藏夹"));
-                }
-            }
-        }
-        return result;
     }
 
     /// <summary>
@@ -1085,8 +1088,29 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
             }
         }
 
-        // 反向包含：候选名比搜索词长（带副标题/版本名），如词 "fate/stay night" ↔
-        // 候选 "Fate／stay night [Unlimited Blade Works]"（嵌套括号会把副标题留在候选名里）
+        // 反向包含：候选名比搜索词长（带副标题/版本名/英文原名），如词 "家庭教师" ↔ 候选
+        // "家庭教師ヒットマンREBORN!"（归一化后 "家庭教师ヒットマンreborn"）。
+        // ① 前缀匹配：门槛以前是 6，中文 2~5 字的完整标题永远走不到这里
+        //    （实测一次任务 66/180 条失败卡在这：家庭教师/我推的孩子/赌博启示录/迷宫干/LIFE…）。
+        //    放宽的同时加两道约束防张冠李戴：候选名必须以搜索词「开头」，且取最短的那个候选。
+        if (searchNorm.Length >= 3)
+        {
+            SearchCandidate? best = null;
+            var bestLen = int.MaxValue;
+            foreach (var item in list)
+            {
+                foreach (var cand in CandidateNames(item))
+                {
+                    var n = TitleParser.ExtractAndNormalizeTitle(cand);
+                    if (n.Length <= searchNorm.Length) continue;
+                    if (!n.StartsWith(searchNorm, StringComparison.Ordinal)) continue;
+                    if (n.Length < bestLen) { best = item; bestLen = n.Length; }
+                }
+            }
+            if (best != null) return best;
+        }
+
+        // ② 原来的「包含即可」（不要求开头）只在 >=6 时保留，避免放宽后把短词配到不相干的候选上。
         if (searchNorm.Length >= 6)
         {
             foreach (var item in list)

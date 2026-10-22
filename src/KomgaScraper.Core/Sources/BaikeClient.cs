@@ -97,14 +97,47 @@ public sealed class BaikeClient : IDisposable
 
     private sealed class CardResponse
     {
-        [JsonPropertyName("id")] public long? Id { get; set; }
-        [JsonPropertyName("newLemmaId")] public long? NewLemmaId { get; set; }
+        [JsonPropertyName("id")]
+        [JsonConverter(typeof(FlexibleInt64Converter))]
+        public long? Id { get; set; }
+        [JsonPropertyName("newLemmaId")]
+        [JsonConverter(typeof(FlexibleInt64Converter))]
+        public long? NewLemmaId { get; set; }
         [JsonPropertyName("title")] public string? Title { get; set; }
         [JsonPropertyName("desc")] public string? Desc { get; set; }
         [JsonPropertyName("abstract")] public string? Abstract { get; set; }
         [JsonPropertyName("image")] public string? Image { get; set; }
         [JsonPropertyName("url")] public string? Url { get; set; }
         [JsonPropertyName("card")] public List<CardFieldResponse>? Card { get; set; }
+    }
+
+    /// <summary>
+    /// 百科的 id / newLemmaId 有时回数字、有时回字符串（甚至空串）→ 宽容转换。
+    /// 实测报错：`The JSON value could not be converted to System.Nullable`1[System.Int32]. Path: $.newLemmaId`
+    /// —— 字段类型不匹配会让整条百科兜底源抛异常（一次任务 3 个系列因此失去兜底）。
+    /// </summary>
+    private sealed class FlexibleInt64Converter : JsonConverter<long?>
+    {
+        public override long? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType switch
+            {
+                JsonTokenType.Null => null,
+                JsonTokenType.Number => reader.TryGetInt64(out var n) ? n : null,
+                JsonTokenType.String => long.TryParse(reader.GetString(), out var s) ? s : null,
+                _ => SkipAndReturnNull(ref reader),
+            };
+
+        private static long? SkipAndReturnNull(ref Utf8JsonReader reader)
+        {
+            reader.Skip();
+            return null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, long? value, JsonSerializerOptions options)
+        {
+            if (value.HasValue) writer.WriteNumberValue(value.Value);
+            else writer.WriteNullValue();
+        }
     }
 
     private sealed class CardFieldResponse

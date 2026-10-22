@@ -14,6 +14,8 @@ public sealed class ManualMatchCollection(KomgaClient komga, IAppLogger log)
     private readonly SemaphoreSlim _sync = new(1, 1);
     private string? _collectionId;
     private List<string> _existingSeriesIds = [];
+    /// <summary>已经确认过「当前不存在」——避免每处理一个系列都全量拉一次 collections。</summary>
+    private bool _missingChecked;
 
     private async Task<T> ExclusiveAsync<T>(Func<Task<T>> work)
     {
@@ -29,6 +31,10 @@ public sealed class ManualMatchCollection(KomgaClient komga, IAppLogger log)
     private async Task<bool> EnsureExistsCoreAsync(string? initialSeriesId, CancellationToken ct)
     {
         if (_collectionId != null) return true;
+        // 已经查过且确认不存在 → 直接短路。以前每次调用都重新 GET v1/collections?unpaged=true
+        // 并再打一遍「不存在」日志：实测一次 1217 系列的任务打了 1036 次（占日志 3%），
+        // 每次都挤在同一个信号量里串行化。等第一个失败系列出现时自然会创建（下面 initialSeriesId 分支）。
+        if (initialSeriesId == null && _missingChecked) return false;
         try
         {
             var collections = await komga.GetCollectionsAsync(ct);
@@ -37,12 +43,14 @@ public sealed class ManualMatchCollection(KomgaClient komga, IAppLogger log)
             {
                 _collectionId = existing.Id;
                 _existingSeriesIds = existing.SeriesIds ?? [];
+                _missingChecked = false;
                 log.Info($"[收藏夹] 已找到 \"{CollectionName}\" (ID:{_collectionId})，包含 {_existingSeriesIds.Count} 个系列");
                 return true;
             }
 
             if (initialSeriesId == null)
             {
+                _missingChecked = true;
                 log.Info($"[收藏夹] \"{CollectionName}\" 不存在，将等失败系列出现时创建");
                 return false;
             }
@@ -50,6 +58,7 @@ public sealed class ManualMatchCollection(KomgaClient komga, IAppLogger log)
             var created = await komga.CreateCollectionAsync(CollectionName, [initialSeriesId], ordered: false, ct);
             _collectionId = created.Id;
             _existingSeriesIds = created.SeriesIds ?? [initialSeriesId];
+            _missingChecked = false;
             log.Info($"[收藏夹] 已使用系列 {initialSeriesId} 创建 \"{CollectionName}\"");
             return true;
         }
@@ -58,6 +67,7 @@ public sealed class ManualMatchCollection(KomgaClient komga, IAppLogger log)
             log.Error($"[收藏夹] 操作 \"{CollectionName}\" 失败: {e.Message}");
             _collectionId = null;
             _existingSeriesIds = [];
+            _missingChecked = false;   // 出错不算「确认不存在」，下次还要再试
             return false;
         }
     }

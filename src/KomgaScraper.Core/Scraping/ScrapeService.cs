@@ -1755,6 +1755,21 @@ public sealed class ScrapeService(KomgaClient komga, BangumiClient bangumi, IApp
             return [];
         }
 
+        // 解析不出卷号的单行本：以前直接拿「排序后的列表序号」当卷号 —— 未解析的都被 OrderBy 排到末尾，
+        // 序号会落进已解析卷号的区间里撞车（实测一次任务 252 次兜底）→ 封面/简介静默挂到错误的册。
+        // 现在按「最小未占用卷号」补齐，保证与已解析卷号不冲突。
+        var parsedNums = volumes.Select(VolNumOf).ToList();
+        var usedNums = parsedNums.Where(n => n.HasValue).Select(n => n!.Value).ToHashSet();
+        var fallbackNums = new Dictionary<int, int>();
+        var nextFree = 1;
+        for (var i = 0; i < volumes.Count; i++)
+        {
+            if (parsedNums[i].HasValue) continue;
+            while (usedNums.Contains(nextFree)) nextFree++;
+            fallbackNums[i] = nextFree;
+            usedNums.Add(nextFree);
+        }
+
         var mates = new VolumeMate[volumes.Count];
         using var semaphore = new SemaphoreSlim(10);
         var tasks = volumes.Select(async (vol, index) =>
@@ -1772,9 +1787,9 @@ public sealed class ScrapeService(KomgaClient komga, BangumiClient bangumi, IApp
                 }
                 coverUrls = coverUrls.Distinct(StringComparer.Ordinal).ToList();
 
-                var num = VolNumOf(vol) ?? (index + 1);
-                if (VolNumOf(vol) == null)
-                    log.Warn($"Bangumi 单行本《{EffName(vol)}》解析不出卷号，按列表序号 {index + 1} 处理");
+                var num = parsedNums[index] ?? fallbackNums[index];
+                if (parsedNums[index] == null)
+                    log.Warn($"Bangumi 单行本《{EffName(vol)}》解析不出卷号，按未占用卷号 {num} 处理（避免与已解析卷号冲突）");
 
                 var isNeedUpdate = needUpdateVolumeNums.Contains(num);
 
