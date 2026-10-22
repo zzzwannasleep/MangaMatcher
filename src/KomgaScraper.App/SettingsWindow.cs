@@ -45,6 +45,7 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox _chkBwTags = new() { Content = "写入类型/题材标签、阅读方向（来自 BookWalker）" };
     private readonly CheckBox _chkBaike = new() { Content = "启用（其它源都查不到时按中文名查百科词条）" };
     private readonly CheckBox _chkMangaDex = new() { Content = "启用（英文圈图源，百科兜底之前；走代理）" };
+    private readonly CheckBox _chkEh = new() { Content = "启用（E-Hentai 表站，同人志/画集兜底；只走表站、零 Cookie，墙内需代理）" };
     private readonly CheckBox _chkJapaneseOnly = new() { Content = "只匹配日漫（韩漫/美漫/国漫候选一律剔除）" };
     private readonly CheckBox _chkKomgaProxy = new() { Content = "Komga 连接走代理（本机/内网部署保持关闭）" };
     private readonly CheckBox _chkCacheEnabled = new() { Content = "启用本地库缓存（打开软件即出数据，不重复拉全库）" };
@@ -99,6 +100,7 @@ public sealed class SettingsWindow : Window
         _chkBwTags.IsChecked = current.BwWriteTags;
         _chkBaike.IsChecked = current.BaikeEnabled;
         _chkMangaDex.IsChecked = current.MangaDexEnabled;
+        _chkEh.IsChecked = current.EhEnabled;
         _chkJapaneseOnly.IsChecked = current.JapaneseOnly;
         _chkKomgaProxy.IsChecked = current.KomgaProxyEnabled;
         _chkCacheEnabled.IsChecked = current.CacheEnabled;
@@ -269,6 +271,7 @@ public sealed class SettingsWindow : Window
         Field("强制刷新", _chkForceRefresh);
         Field("百科兜底", _chkBaike);
         Field("MangaDex", _chkMangaDex);
+        Field("E-Hentai（表站）", _chkEh);
         Field("日漫限定", _chkJapaneseOnly);
         Field("Komga 代理", _chkKomgaProxy);
         var concRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
@@ -588,6 +591,7 @@ public sealed class SettingsWindow : Window
         TagBlacklist = SplitLines(_txtTagBlacklist.Text ?? ""),
         BaikeEnabled = _chkBaike.IsChecked == true,
         MangaDexEnabled = _chkMangaDex.IsChecked == true,
+        EhEnabled = _chkEh.IsChecked == true,
         JapaneseOnly = _chkJapaneseOnly.IsChecked == true,
         KomgaProxyEnabled = _chkKomgaProxy.IsChecked == true,
         CacheEnabled = _chkCacheEnabled.IsChecked == true,

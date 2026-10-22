@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
     private MoxClient? _mox;
     private BaikeClient? _baike;
     private MangaDexClient? _mdex;
+    private EhClient? _eh;
     private ScrapeStateStore? _state;
     private LibraryCache? _libCache;
     private DispatcherTimer? _libCacheTimer;

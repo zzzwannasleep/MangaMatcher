@@ -47,6 +47,8 @@ public sealed class AppSettings
     [JsonPropertyName("baikeEnabled")] public bool BaikeEnabled { get; set; } = true;
     /// <summary>MangaDex 源（免密钥公开 API）：bgm/目录站/百科都没有但英文区收录的作品（走代理）。</summary>
     [JsonPropertyName("mangadexEnabled")] public bool MangaDexEnabled { get; set; } = true;
+    /// <summary>E-Hentai 表站（同人志/画集兜底）：只走表站、零 Cookie、零登录；墙内必须配代理。</summary>
+    [JsonPropertyName("ehEnabled")] public bool EhEnabled { get; set; } = true;
     /// <summary>只匹配日本漫画：韩漫/美漫/国漫候选在匹配阶段一律剔除（本地库只有日漫）。</summary>
     [JsonPropertyName("japaneseOnly")] public bool JapaneseOnly { get; set; } = true;
     /// <summary>

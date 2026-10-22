@@ -112,6 +112,15 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
     /// <summary>MangaDex（英文圈图源，免密钥公开 API）。百科兜底前的英文区回退。</summary>
     public MangaDexClient? MangaDex { get; set; }
 
+    private EhClient? _eh;
+
+    /// <summary>E-Hentai 表站（可选源，同人志/画集兜底）。百科兜底之前；命中判定保守（宁缺毋滥）。</summary>
+    public EhClient? Eh
+    {
+        get => _eh;
+        set { _eh = value; _scrape.Eh = value; }
+    }
+
     /// <summary>版本/格式标记的黑白名单（转发给内部 ScrapeService；null/空 = 只用内置词表）。</summary>
     public List<string>? MarkerWhitelist
     {
@@ -817,6 +826,64 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
                     }
                 }
 
+                // ---- 回退 4.6：E-Hentai 表站（同人志/画集兜底；命中判定保守，宁缺毋滥）----
+                //
+                // 精度关键：EH 的 f_search 支持标签语法，纯文本搜索在脏标题场景下几乎必错
+                // （实测 f_search=asanagi 首条是无关作品，f_search=artist:asanagi 全是该作者的作品）。
+                // 所以先按前 3 个候选词做文本搜索，再用文件名方括号段做一次 artist: 标签搜索，
+                // 两路结果按 EhID 合并去重后统一判定（每系列最多 4 次请求，EH 节流 1100ms）。
+                if (Eh != null)
+                {
+                    var ehHits = new List<SearchCandidate>();
+                    var seenEh = new HashSet<string>(StringComparer.Ordinal);
+                    void AddEhHits(List<SearchCandidate> list)
+                    {
+                        foreach (var c in list)
+                        {
+                            if (!string.IsNullOrEmpty(c.EhId) && !seenEh.Add(c.EhId)) continue;
+                            ehHits.Add(c);
+                        }
+                    }
+
+                    for (var i = 0; i < terms.Count && i < 3; i++)
+                    {
+                        try { AddEhHits(await EhSearchCandidatesAsync(terms[i], ct)); }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                        catch (Exception e) { log.Warn($"《{seriesName}》E-Hentai 搜索失败（\"{terms[i]}\"）: {e.Message}"); }
+                    }
+                    var artistTag = EhArtistTag(seriesName);
+                    if (artistTag.Length > 0)
+                    {
+                        try
+                        {
+                            var list = await EhSearchCandidatesAsync("artist:" + artistTag, ct);
+                            log.Info($"《{seriesName}》E-Hentai artist:\"{artistTag}\" 标签搜索得 {list.Count} 个候选");
+                            AddEhHits(list);
+                        }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                        catch (Exception e) { log.Warn($"《{seriesName}》E-Hentai artist 标签搜索失败（\"{artistTag}\"）: {e.Message}"); }
+                    }
+
+                    for (var i = 0; i < terms.Count && i < 3; i++)
+                    {
+                        var ehHit = PickEhCandidate(ehHits, terms[i]);
+                        if (ehHit?.EhId == null) continue;
+                        try
+                        {
+                            var gallery = await Eh.GetGalleryAsync(ehHit.EhId, ct);
+                            log.Info($"《{seriesName}》E-Hentai 命中:《{gallery.Title}》，刮削中…");
+                            var ehResult = await _scrape.ScrapeFromEhAsync(series.Id, gallery,
+                                Opts(syncType, forceRematch), series, komgaMeta, ct);
+                            if (ehResult.Success)
+                                return result with { Success = true, MatchedTitle = gallery.Title };
+                            log.Warn($"《{seriesName}》E-Hentai 刮削失败: {ehResult.Error}");
+                        }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                        catch (Exception e) { log.Warn($"《{seriesName}》E-Hentai 刮削失败: {e.Message}"); }
+                        break;   // 搜到了（哪怕没刮成）就不再换词
+                    }
+                }
+
                 // ---- 回退 5：百度百科（词条卡片）——bgm/目录站/AI 都没有的冷门漫画，百科多半有 ----
                 if (Baike != null)
                 {
@@ -1137,10 +1204,116 @@ public sealed class BatchMatcher(KomgaClient komga, BangumiClient bangumi, IAppL
         }
     }
 
-    /// <summary>候选面板的来源标签：Bgm（Bangumi）/ Bw（BookWalker）/ Mox（bookof.moe）/ MangaDex / Baike（百度百科）。</summary>
+    /// <summary>候选面板的来源标签：Bgm（Bangumi）/ Bw（BookWalker）/ Mox（bookof.moe）/ MangaDex / Baike（百度百科）/ EH（E-Hentai）。</summary>
     public const string SourceMox = "Mox";
     public const string SourceBaike = "Baike";
     public const string SourceMangaDex = "MangaDex";
+    public const string SourceEh = "EH";
+
+    // ---------- E-Hentai 命中判定（保守，避免同人志海量同人作品误配）----------
+
+    /// <summary>把 EH 搜索结果转成跨源候选（Title=清洗后标题，Aliases=原始标题，Author=首段方括号）。</summary>
+    private async Task<List<SearchCandidate>> EhSearchCandidatesAsync(string term, CancellationToken ct)
+    {
+        if (Eh == null) return [];
+        var hits = await Eh.SearchAsync(term, EhClient.MaxBatch, ct).ConfigureAwait(false);
+        return hits.Select(h => new SearchCandidate(
+            0, EhClient.CleanTitle(h.Title), "", EhClient.AuthorOf(h.Title), h.Title, h.Thumb,
+            SourceEh, EhId: h.Id)).ToList();
+    }
+
+    /// <summary>
+    /// EH 保守命中判定（宁缺毋滥）：
+    /// ① 精确匹配（FindPreciseMatch，含残留垃圾词检查）直接采纳；
+    /// ② 否则只认「搜索词 ≥6 字且最佳相似度 ≥0.55」——短词（2~3 字日文标题）相似度不可靠，一律不认。
+    /// </summary>
+    private static SearchCandidate? PickEhCandidate(List<SearchCandidate> hits, string term)
+    {
+        if (hits.Count == 0) return null;
+        var precise = FindPreciseMatch(hits, TitleParser.ExtractAndNormalizeTitle(term));
+        if (precise != null) return precise;
+        if (term.Trim().Length < 6) return null;
+        SearchCandidate? best = null;
+        var bestSim = 0.0;
+        foreach (var c in hits)
+        {
+            var sim = EhSim(c, term);
+            if (sim > bestSim) { bestSim = sim; best = c; }
+        }
+        return bestSim >= 0.55 ? best : null;
+    }
+
+    /// <summary>候选名与搜索词的 bigram Jaccard（取最佳候选名）。</summary>
+    private static double EhSim(SearchCandidate c, string term)
+    {
+        static HashSet<string> Grams(string s)
+        {
+            var set = new HashSet<string>(StringComparer.Ordinal);
+            if (s.Length == 1) set.Add(s);
+            for (var i = 0; i + 1 < s.Length; i++) set.Add(s.Substring(i, 2));
+            return set;
+        }
+
+        var tg = Grams(TitleParser.ExtractAndNormalizeTitle(term));
+        var best = 0.0;
+        foreach (var n in CandidateNames(c))
+        {
+            var g = Grams(TitleParser.ExtractAndNormalizeTitle(n));
+            if (g.Count == 0 || tg.Count == 0) continue;
+            var inter = g.Count(tg.Contains);
+            var j = (double)inter / (g.Count + tg.Count - inter);
+            if (j > best) best = j;
+        }
+        return best;
+    }
+
+    /// <summary>语言/版本/格式标记：按「词」精确比对（避免误伤 Draw/Strawberry 这类作者名）。</summary>
+    private static readonly HashSet<string> EhTagNoiseExact = new(StringComparer.Ordinal)
+    {
+        "chinese", "english", "japanese", "korean",
+        "digital", "decensored", "uncensored", "translated", "raw",
+    };
+
+    /// <summary>汉化/版本标记：子串比对（中文词不会误伤英文作者名）。</summary>
+    private static readonly string[] EhTagNoisePart =
+        ["汉化", "中文", "日文", "英文", "无修正", "無修正", "全彩", "同人志", "同人誌", "dl版", "卷", "册", "话", "話"];
+
+    private static bool EhIsTagNoise(string s)
+    {
+        var low = s.ToLowerInvariant();
+        if (EhTagNoisePart.Any(low.Contains)) return true;
+        foreach (var tok in low.Split([' ', '\t', '-', '_', '.', ',', '/', '(', ')', '[', ']', '+'],
+                     StringSplitOptions.RemoveEmptyEntries))
+            if (EhTagNoiseExact.Contains(tok)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 从文件名方括号段挑一个能做 EH `artist:` 标签搜索的名字：
+    /// 优先「社团 (画师)」括号里的画师名（[MTSP (Jin)] → Jin），其次不含空格的段；
+    /// 跳过语言/版本/格式标记。第 1 个方括号段通常是标题，所以先扫 parts[1:] 再兜底 parts[0]。
+    /// </summary>
+    private static string EhArtistTag(string seriesName)
+    {
+        var parts = TitleParser.ExtractBracketParts(seriesName);
+        var order = new List<string>();
+        if (parts.Count > 1) order.AddRange(parts.Skip(1));
+        if (parts.Count > 0) order.Add(parts[0]);
+        foreach (var raw in order)
+        {
+            var s = raw.Trim();
+            if (s.Length < 2 || s.Length > 40 || EhIsTagNoise(s)) continue;
+            // [MTSP (Jin)] → 括号内的画师名才是 EH 的 artist 标签
+            var i = s.LastIndexOf('(');
+            if (i >= 0 && s.EndsWith(')'))
+            {
+                var inner = s[(i + 1)..^1].Trim();
+                if (inner.Length is >= 2 and <= 40 && !inner.Any(char.IsWhiteSpace)) return inner;
+            }
+            if (!s.Any(char.IsWhiteSpace)) return s;
+        }
+        return "";
+    }
 }
 
 /// <summary>匹配类型（platform 过滤），对齐脚本 getBangumiMatchType。</summary>

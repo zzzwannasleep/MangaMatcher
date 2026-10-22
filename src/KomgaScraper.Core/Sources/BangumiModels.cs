@@ -83,7 +83,7 @@ public sealed class BangumiSearchResponseDto
 
 // ========== UI/服务层使用的归一化模型 ==========
 
-/// <summary>搜索候选（对应脚本 fetchBookByName 的返回项）。Source: "Bgm" / "Bw" / "Mox" / "MangaDex" / "Baike"。</summary>
+/// <summary>搜索候选（对应脚本 fetchBookByName 的返回项）。Source: "Bgm" / "Bw" / "Mox" / "MangaDex" / "Baike" / "EH"。</summary>
 public sealed record SearchCandidate(
     int Id,
     string Title,
@@ -94,7 +94,8 @@ public sealed record SearchCandidate(
     string Source = "Bgm",
     string? BwId = null,
     string? MoxId = null,
-    string? MdId = null);
+    string? MdId = null,
+    string? EhId = null);
 
 /// <summary>单行本信息（对应脚本 volumeMates）。</summary>
 public sealed class VolumeMate

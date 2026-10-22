@@ -154,6 +154,43 @@ public sealed partial class MainWindow
             _batch.MangaDex = _mdex;
             Log("INFO", "MangaDex 源已启用（英文区回退，百科兜底之前）");
         }
+
+        // E-Hentai 表站（同人志/画集兜底；只走表站、零 Cookie）
+        _eh = null;
+        _scrape.Eh = null;
+        _batch.Eh = null;
+        if (_settings.EhEnabled)
+        {
+            try
+            {
+                _eh = new EhClient(_settings.Proxy, new UiLogger(Log, (_, _, _) => { }));
+                _batch.Eh = _eh;
+                if (!_settings.Proxy.IsSet)
+                    Log("WARN", "E-Hentai 源已启用，但未配置代理：e-hentai.org 在中国大陆直连不通（连续 2 次失败后本次任务熔断跳过）");
+                else
+                    Log("INFO", "E-Hentai 表站源已启用（同人志兜底，百科兜底之前；只走表站、零 Cookie）");
+                // 中文标签词库：首次后台下载（约 1.3MB gz），失败只回落英文标签，不阻塞刮削
+                EhTags.Configure(Path.Combine(AppSettings.DataDir, "ehtags"), _settings.Proxy, m => Log("INFO", m));
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await EhTags.EnsureAsync().ConfigureAwait(false);
+                        if (EhTags.Ready)
+                            Log("INFO", $"E-Hentai 中文标签词库就绪：{EhTags.Count} 条（{EhTags.Version}）");
+                        else
+                            Log("WARN", $"E-Hentai 中文标签词库不可用，回落英文标签：{EhTags.LastError}");
+                    }
+                    catch (Exception e) { Log("WARN", $"E-Hentai 标签词库初始化失败（不影响刮削）: {e.Message}"); }
+                });
+            }
+            catch (Exception e)
+            {
+                _eh = null;
+                _batch.Eh = null;
+                Log("WARN", $"E-Hentai 源初始化失败: {e.Message}");
+            }
+        }
         Log("INFO", _settings.JapaneseOnly
             ? "日漫限定：韩漫/美漫/国漫候选一律剔除"
             : "日漫限定已关闭：不再过滤非日漫候选");

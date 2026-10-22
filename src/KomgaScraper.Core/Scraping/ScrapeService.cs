@@ -71,6 +71,9 @@ public sealed class ScrapeService(KomgaClient komga, BangumiClient bangumi, IApp
     /// <summary>百度百科客户端（可选最终兜底源）：所有源都没命中时的冷门漫画数据（词条卡片，国内直连不走代理）。</summary>
     public BaikeClient? Baike { get; set; }
 
+    /// <summary>E-Hentai 表站（可选源，同人志/画集兜底）。百科兜底之前。</summary>
+    public EhClient? Eh { get; set; }
+
     /// <summary>是否把 BookWalker 推断出的类型/题材标签、阅读方向写入 Komga。</summary>
     public bool BwWriteTags { get; set; } = true;
 
@@ -102,6 +105,7 @@ public sealed class ScrapeService(KomgaClient komga, BangumiClient bangumi, IApp
 
     /// <summary>下载外部封面（不走 Komga 的 HttpClient，避免带上 Komga 认证头/基址）。
     /// 百度百科图片有防盗链（缺 Referer 直接 400）→ 走 BaikeClient 的直连通道。
+    /// E-Hentai 的 ehgt.org 缩略图也认 Referer，统一补 e-hentai.org。
     /// 全部封面下载经 CoverCache 磁盘暂存：材料先落本地，重跑命中缓存不再重复下载。</summary>
     private async Task<byte[]> DownloadImageAsync(string url, CancellationToken ct)
     {
@@ -110,7 +114,12 @@ public sealed class ScrapeService(KomgaClient komga, BangumiClient bangumi, IApp
                 ? (u, token) => Baike.DownloadImageAsync(u, token)
                 : async (u, token) =>
                 {
-                    using var resp = await ImageHttp.GetAsync(u, HttpCompletionOption.ResponseHeadersRead, token)
+                    using var req = new HttpRequestMessage(HttpMethod.Get, u);
+                    if (u.Contains("ehgt.org", StringComparison.OrdinalIgnoreCase) ||
+                        u.Contains("e-hentai.org", StringComparison.OrdinalIgnoreCase) ||
+                        u.Contains("exhentai.org", StringComparison.OrdinalIgnoreCase))
+                        req.Headers.Referrer = new Uri("https://e-hentai.org/");
+                    using var resp = await ImageHttp.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token)
                         .ConfigureAwait(false);
                     if (!resp.IsSuccessStatusCode)
                         throw new InvalidOperationException($"下载封面失败 {(int)resp.StatusCode}: {u}");
@@ -1241,6 +1250,309 @@ public sealed class ScrapeService(KomgaClient komga, BangumiClient bangumi, IApp
             log.Error($"百度百科刮削系列 {komgaSeriesId} 失败: {e.Message}");
             return new ScrapeResult { Success = false, Error = e.Message };
         }
+    }
+
+    /// <summary>E-Hentai 标签写入上限（预览与写库共用，改这一处即可）。</summary>
+    public const int EhTagLimit = 12;
+
+    /// <summary>命名空间优先级：画师/社团/原作/角色在前，语言/分类垫底。</summary>
+    private static readonly string[] EhTagNsOrder =
+        ["artist", "group", "parody", "character", "female", "male", "mixed", "other", "language", "category"];
+
+    /// <summary>
+    /// 用 E-Hentai 表站画廊数据刮削系列（一个画廊 = 一册；只补空缺，不覆盖用户已有数据）。
+    ///
+    /// 与其它源的三点区别：
+    ///  • EH 没有简介字段 → 刻意**不调** ClearStaleSeriesAsync（否则会把用户已有简介当脏数据清掉）；
+    ///  • 画师/社团写 **book 级** authors（Komga 的 series PATCH 不吃 authors）；
+    ///  • 标签是「中文命名空间:中文标签」形态，按命名空间优先级 + 上限 12 条。
+    /// </summary>
+    public async Task<ScrapeResult> ScrapeFromEhAsync(
+        string komgaSeriesId, EhGallery gallery, ScrapeOptions opt,
+        SeriesDto? knownSeries = null, SeriesMetadataDto? knownMeta = null, CancellationToken ct = default)
+    {
+        try
+        {
+            var series = knownSeries ?? await komga.GetSeriesAsync(komgaSeriesId, ct).ConfigureAwait(false);
+            var seriesName = series.Metadata?.Title ?? series.Name;
+            log.Info($"刮削 《{seriesName}》 ← E-Hentai 《{gallery.Title}》" + (opt.DryRun ? " [Dry-run]" : ""));
+
+            var komgaMeta = knownMeta ?? (knownSeries?.Metadata?.Links != null ? knownSeries.Metadata : null)
+                            ?? await komga.GetSeriesMetadataAsync(komgaSeriesId, ct).ConfigureAwait(false);
+            if (opt.ReplaceMatch && komgaMeta != null)
+                komgaMeta = ClearedForReplace(komgaMeta);
+
+            var meta = new SeriesMetadataDto();
+            var hasAny = false;
+            var changes = new List<string>();
+
+            // ---- 标题：为空（或复制副本残留 / 纠正匹配）才写，绝不覆盖用户已有标题 ----
+            if (!opt.CoverOnly &&
+                (string.IsNullOrWhiteSpace(komgaMeta?.Title) || TitleParser.HasCopySuffix(komgaMeta!.Title!) || opt.ReplaceMatch) &&
+                gallery.Title.Trim().Length > 0)
+            {
+                var t = TitleParser.StripCopySuffix(gallery.Title.Trim());
+                if (t.Length > 0) { meta.Title = t; meta.TitleSort = t; hasAny = true; changes.Add("标题"); }
+            }
+
+            // ---- 日文原名 → 别名 ----
+            if (!opt.CoverOnly && komgaMeta?.AlternateTitlesLock != true && gallery.TitleJpn.Trim().Length > 0)
+            {
+                var jpn = gallery.TitleJpn.Trim();
+                var merged = new List<AlternateTitleDto>(komgaMeta?.AlternateTitles ?? []);
+                var seen = new HashSet<string>(merged.Select(x => x.Title), StringComparer.OrdinalIgnoreCase);
+                if (jpn.Length <= 80 && !seen.Contains(jpn) &&
+                    !jpn.Equals(gallery.Title, StringComparison.OrdinalIgnoreCase))
+                {
+                    merged.Add(new AlternateTitleDto { Label = "原名", Title = TitleParser.Capitalize(jpn) });
+                    meta.AlternateTitles = merged; hasAny = true; changes.Add("别名 1");
+                }
+            }
+
+            // ---- 发售日：posted（unix 秒）→ YYYY-MM-DD ----
+            if (komgaMeta?.ReleaseDateLock != true && string.IsNullOrWhiteSpace(komgaMeta?.ReleaseDate))
+            {
+                var d = EhPostedDate(gallery.Posted);
+                if (d.Length > 0) { meta.ReleaseDate = d; hasAny = true; changes.Add($"发售日 {d}"); }
+            }
+
+            // ---- 语言：language:chinese/japanese/english/korean → zh/ja/en/ko ----
+            if (komgaMeta?.LanguageLock != true && string.IsNullOrWhiteSpace(komgaMeta?.Language))
+            {
+                var lang = EhLanguageCode(gallery.Tags);
+                if (lang.Length > 0) { meta.Language = lang; hasAny = true; changes.Add($"语言 {lang}"); }
+            }
+
+            // ---- 标签：中文翻译 + 命名空间优先级 + 上限 12（已有标签不占额度、不被删）----
+            if (!opt.CoverOnly && komgaMeta?.TagsLock != true)
+            {
+                var tags = new List<string>(komgaMeta?.Tags ?? []);
+                var added = 0;
+                foreach (var t in EhTagNames(gallery.Tags, EhTagLimit))
+                {
+                    if (added >= EhTagLimit) break;
+                    if (!tags.Contains(t, StringComparer.OrdinalIgnoreCase)) { tags.Add(t); added++; }
+                }
+                if (added > 0)
+                {
+                    tags = tags.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    if (!tags.Contains(VersionMarker.MachineTag, StringComparer.Ordinal))
+                        tags.Add(VersionMarker.MachineTag);
+                    meta.Tags = tags; hasAny = true; changes.Add($"标签 +{added}");
+                }
+            }
+
+            // 程序打标：MACHINE 标签 + 文件夹名版本/格式标记
+            var markChanges = new List<string>();
+            ApplyScrapeMarks(meta, series, komgaMeta, markChanges);
+            if (markChanges.Count > 0) { hasAny = true; changes.AddRange(markChanges); }
+
+            // ---- 链接：EH 画廊页（已有 e-hentai/exhentai 链接则不重复加）----
+            var links = new List<LinkDto>(komgaMeta?.Links ?? []);
+            var linkAdded = false;
+            if (gallery.Url.Length > 0 && !links.Any(l =>
+                    l.Url.Contains("e-hentai.org", StringComparison.OrdinalIgnoreCase) ||
+                    l.Url.Contains("exhentai.org", StringComparison.OrdinalIgnoreCase)))
+            {
+                links.Add(new LinkDto { Label = "EH", Url = gallery.Url });
+                linkAdded = true;
+            }
+            if (linkAdded) meta.Links = links;
+
+            // 材料收集：画廊缩略图（该源唯一的图）先落盘暂存
+            var coverUrl = Eh?.CoverUrl(gallery) ?? "";
+            if (opt.SyncType == SyncType.All && coverUrl.Length > 0 && !opt.DryRun)
+            {
+                await CoverCache.WarmUpAsync([coverUrl], DownloadImageAsync, log.Warn, serial: true, ct)
+                    .ConfigureAwait(false);
+            }
+
+            if (opt.CoverOnly)
+            {
+                log.Info($"《{seriesName}》封面独立刮削：跳过元数据写入（E-Hentai）");
+            }
+            else if (!hasAny && !linkAdded)
+            {
+                log.Info($"《{seriesName}》E-Hentai 系列字段均已存在，无需更新");
+            }
+            else if (opt.DryRun)
+            {
+                log.Info($"[Dry-run] PATCH /series/{komgaSeriesId}/metadata（E-Hentai）：" +
+                         (changes.Count > 0 ? string.Join("、", changes) : "仅链接") + " " + SummarizeMeta(meta));
+                Observe(ScrapeChangeKind.SeriesMeta, komgaSeriesId, $"《{seriesName}》",
+                    "将更新系列元数据（E-Hentai）", PreviewSeriesPatch(komgaMeta, meta));
+            }
+            else
+            {
+                await komga.PatchSeriesMetadataAsync(komgaSeriesId, meta, ct).ConfigureAwait(false);
+                log.Info($"《{seriesName}》系列信息已更新（E-Hentai）：{string.Join("、", changes)}");
+                Observe(ScrapeChangeKind.SeriesMeta, komgaSeriesId, $"《{seriesName}》",
+                    "已更新系列元数据（E-Hentai）", PreviewSeriesPatch(komgaMeta, meta));
+            }
+            // EH 无简介字段 → 刻意不调 ClearStaleSeriesAsync（不清旧简介），见方法注释
+
+            if (!opt.DryRun && !opt.CoverOnly)
+            {
+                await ManualMatch.EnsureExistsAsync(ct: ct);
+                await ManualMatch.RemoveSeriesAsync(komgaSeriesId, seriesName, ct);
+            }
+
+            // ---- 画师 / 社团 → book 级 authors（series PATCH 不吃 authors；一册一个画廊，取第一册）----
+            var authors = EhArtistAuthors(gallery.Tags);
+            if (authors.Count > 0 && !opt.DryRun && !opt.CoverOnly)
+            {
+                try
+                {
+                    var books = await komga.ListBooksInSeriesAsync(komgaSeriesId, ct).ConfigureAwait(false);
+                    var book = books.FirstOrDefault(b => !b.Deleted);
+                    if (book != null)
+                    {
+                        var hasAuthors = (book.Metadata?.Authors ?? []).Count > 0;
+                        var locked = book.Metadata?.AuthorsLock == true;
+                        if (!hasAuthors && !locked)
+                        {
+                            var bookMeta = new BookMetadataDto { Authors = authors };
+                            await komga.PatchBookMetadataAsync(book.Id, bookMeta, ct).ConfigureAwait(false);
+                            log.Info($"《{seriesName}》卷作者已更新（E-Hentai）：{string.Join("、", authors.Select(a => a.Name))}");
+                            Observe(ScrapeChangeKind.BookMeta, komgaSeriesId, $"《{seriesName}》卷 {book.Number:00}",
+                                "已更新卷作者（E-Hentai）");
+                        }
+                    }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception e)
+                {
+                    // 作者写不上不该让整条刮削失败
+                    log.Warn($"《{seriesName}》E-Hentai 画师/社团写入失败：{e.Message}");
+                }
+            }
+            else if (authors.Count > 0 && opt.DryRun)
+            {
+                log.Info($"[Dry-run] 将更新卷作者（E-Hentai）：{string.Join("、", authors.Select(a => a.Name))}");
+            }
+
+            // ---- 封面：画廊缩略图（ehgt.org，下载时补 EH Referer）----
+            if (opt.SyncType == SyncType.All)
+            {
+                if (opt.DryRun)
+                {
+                    log.Info(coverUrl.Length > 0
+                        ? "[Dry-run] 将上传系列封面（E-Hentai）"
+                        : $"[Dry-run]《{seriesName}》E-Hentai 无封面，真实模式将清空旧封面");
+                }
+                else if (coverUrl.Length > 0)
+                {
+                    if (series.Oneshot)
+                    {
+                        var books = await komga.ListBooksInSeriesAsync(komgaSeriesId, ct).ConfigureAwait(false);
+                        await UpdateOneshotBookCoverAsync(series, books, seriesName, [coverUrl], ct).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await UpdateSeriesCoverAsync(komgaSeriesId, seriesName, [coverUrl], opt, ct).ConfigureAwait(false);
+                    }
+                }
+                else if (!opt.CoverOnly)
+                {
+                    await ClearSeriesCoverAsync(komgaSeriesId, seriesName, ct).ConfigureAwait(false);
+                }
+            }
+
+            if (!opt.DryRun && !opt.CoverOnly && meta.Tags == null)
+                await EnsureMachineTagAsync(komgaSeriesId, seriesName, komgaMeta, ct).ConfigureAwait(false);
+
+            return new ScrapeResult { Success = true, MatchedTitle = gallery.Title };
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log.Error($"E-Hentai 刮削系列 {komgaSeriesId} 失败: {e.Message}");
+            return new ScrapeResult { Success = false, Error = e.Message };
+        }
+    }
+
+    /// <summary>EH 原始标签 "ns:tag" → (ns 小写, tag)；无冒号返回空。</summary>
+    private static (string Ns, string Tag) SplitEhRawTag(string raw)
+    {
+        var s = (raw ?? "").Trim();
+        var i = s.IndexOf(':');
+        if (i <= 0) return ("", "");
+        return (s[..i].Trim().ToLowerInvariant(), s[(i + 1)..].Trim());
+    }
+
+    /// <summary>
+    /// 按命名空间优先级把 "ns:tag" 转成「中文命名空间:中文标签」（词库未收录回落原始 tag 名）。
+    /// 预览与写库共用这一份，保证「看到的标签」= 「写进去的标签」。
+    /// </summary>
+    public static List<string> EhTagNames(IEnumerable<string> rawTags, int limit)
+    {
+        var byNs = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var raw in rawTags ?? [])
+        {
+            var (ns, tag) = SplitEhRawTag(raw);
+            if (ns.Length == 0 || tag.Length == 0) continue;
+            if (!byNs.TryGetValue(ns, out var bucket)) byNs[ns] = bucket = [];
+            bucket.Add(tag);
+        }
+        var outp = new List<string>(limit);
+        foreach (var ns in EhTagNsOrder)
+        {
+            if (!byNs.TryGetValue(ns, out var bucket)) continue;
+            foreach (var tag in bucket)
+            {
+                if (outp.Count >= limit) return outp;
+                var name = EhTags.Translate(ns, tag);
+                if (string.IsNullOrWhiteSpace(name)) name = tag;
+                outp.Add(EhTags.Label(ns) + ":" + name);
+            }
+        }
+        return outp;
+    }
+
+    /// <summary>artist/group 标签 → book 级作者（画师在前、社团在后，最多 6 个）。</summary>
+    public static List<AuthorDto> EhArtistAuthors(IEnumerable<string> rawTags)
+    {
+        var outp = new List<AuthorDto>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var list = rawTags as IList<string> ?? (rawTags ?? []).ToList();
+        foreach (var ns in new[] { "artist", "group" })
+        {
+            foreach (var raw in list)
+            {
+                var (tns, tag) = SplitEhRawTag(raw);
+                if (tns != ns || tag.Length == 0) continue;
+                var name = EhTags.Translate(ns, tag);
+                if (string.IsNullOrWhiteSpace(name)) name = tag;
+                if (outp.Count >= 6 || !seen.Add(name)) continue;
+                outp.Add(new AuthorDto { Name = name, Role = "Artist" });
+            }
+        }
+        return outp;
+    }
+
+    /// <summary>language:xxx → ISO 码（只认四种常见语言）。</summary>
+    public static string EhLanguageCode(IEnumerable<string> rawTags)
+    {
+        foreach (var raw in rawTags ?? [])
+        {
+            var (ns, tag) = SplitEhRawTag(raw);
+            if (ns != "language") continue;
+            switch (tag.ToLowerInvariant())
+            {
+                case "chinese": return "zh";
+                case "japanese": return "ja";
+                case "english": return "en";
+                case "korean": return "ko";
+            }
+        }
+        return "";
+    }
+
+    /// <summary>posted（unix 秒字符串）→ YYYY-MM-DD。</summary>
+    public static string EhPostedDate(string? posted)
+    {
+        if (!long.TryParse((posted ?? "").Trim(), out var sec) || sec <= 0) return "";
+        try { return DateTimeOffset.FromUnixTimeSeconds(sec).UtcDateTime.ToString("yyyy-MM-dd"); }
+        catch { return ""; }
     }
 
     /// <summary>
