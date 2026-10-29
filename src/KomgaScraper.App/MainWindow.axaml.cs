@@ -100,6 +100,9 @@ public sealed partial class MainWindow : Window
         WireEvents();
         SetupTray();
 
+        // 支持把漫画压缩包拖到 exe 上/用命令行参数打开：启动后直接进超分窗口
+        Loaded += async (_, _) => await TryOpenStartupArchiveAsync();
+
         LoadSettingsToUi();
         ApplyTheme(_settings.Theme == "dark", persist: false);
         RebuildClients();
@@ -156,6 +159,7 @@ public sealed partial class MainWindow : Window
         BtnManualMatch.Click += async (_, _) => await CorrectMatchAsync();
         BtnCoverScrape.Click += async (_, _) => await CoverScrapeAsync();
         BtnFolderTag.Click += async (_, _) => await FolderTagAsync();
+        BtnUpscale.Click += async (_, _) => await OpenUpscaleAsync();
         BtnDedupe.Click += async (_, _) => await OpenDedupeAsync();
         BtnMylarExport.Click += async (_, _) => await MylarExportAsync();
         BtnOpenData.Click += (_, _) => OpenDataDir();
@@ -693,7 +697,7 @@ public sealed partial class MainWindow : Window
     {
         _busy = busy;
         foreach (var b in new[] { BtnTest, BtnLoad, BtnSettings, BtnScrapeMeta, BtnScrapeAll, BtnManualMatch,
-                     BtnCoverScrape, BtnRematch, BtnFolderTag, BtnMylarExport, BtnExportLog, BtnDedupe })
+                     BtnCoverScrape, BtnRematch, BtnFolderTag, BtnMylarExport, BtnExportLog, BtnUpscale, BtnDedupe })
             b.IsEnabled = !busy;
         BtnCancel.IsEnabled = busy;
         BtnCancel.Opacity = busy ? 1 : 0.55;

@@ -87,6 +87,27 @@ public sealed class AppSettings
     /// <summary>上次用的判定强度："size" / "pages"（默认）/ "hash"。</summary>
     [JsonPropertyName("dedupeMatch")] public string DedupeMatch { get; set; } = "pages";
 
+    // ================= 图片超分（导入压缩包 → GPU 超分 → WebP q95 → CBZ） =================
+
+    /// <summary>上次选的模型 id（官方三个之一，或用户导入的自定义模型 id）。</summary>
+    [JsonPropertyName("upscaleModel")] public string UpscaleModel { get; set; } = Upscale.UpscaleModelCatalog.SpecializedId;
+    /// <summary>上次选的倍率（必须被所选模型支持）。</summary>
+    [JsonPropertyName("upscaleScale")] public int UpscaleScale { get; set; } = 4;
+    /// <summary>ncnn 瓦片大小，0 = 自动。</summary>
+    [JsonPropertyName("upscaleTile")] public int UpscaleTile { get; set; }
+    /// <summary>TTA 质量优先模式（更慢）。</summary>
+    [JsonPropertyName("upscaleTta")] public bool UpscaleTta { get; set; }
+    /// <summary>Vulkan 设备编号，-1 = 自动（会优先挑独显）。</summary>
+    [JsonPropertyName("upscaleGpuId")] public int UpscaleGpuId { get; set; } = -1;
+    /// <summary>输出长边上限（像素，0 = 不限制）。</summary>
+    [JsonPropertyName("upscaleMaxLongSide")] public int UpscaleMaxLongSide { get; set; }
+    /// <summary>输出目录（空 = 与导入的压缩包同目录）。</summary>
+    [JsonPropertyName("upscaleOutputDir")] public string UpscaleOutputDir { get; set; } = "";
+    /// <summary>单页失败时跳过继续（否则整次中止）。</summary>
+    [JsonPropertyName("upscaleSkipFailed")] public bool UpscaleSkipFailed { get; set; }
+    /// <summary>ComicInfo 的语言代码。</summary>
+    [JsonPropertyName("upscaleLanguage")] public string UpscaleLanguage { get; set; } = "zh";
+
     // ================= 便携式路径（全部在 exe 同目录下） =================
 
     /// <summary>数据目录：&lt;exe 所在目录&gt;\data。单文件发布时即 exe 旁边的 data 文件夹。</summary>

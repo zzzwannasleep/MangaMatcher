@@ -1,0 +1,236 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="KomgaScraper.App.UpscaleWindow"
+        Title="图片超分 — 压缩包 → GPU 超分 → WebP 95 → CBZ"
+        Width="1300" Height="900" MinWidth="1120" MinHeight="740"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Microsoft YaHei UI, PingFang SC, Segoe UI"
+        Background="{DynamicResource AppBgBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="10">
+
+        <!-- ================= 显卡状态 ================= -->
+        <Border Grid.Row="0" Classes="group" Padding="12,9" Margin="0,0,0,8">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="3">
+                    <TextBlock x:Name="TxtGpu" Text="显卡：检测中…" TextWrapping="Wrap" FontSize="12" />
+                    <TextBlock x:Name="TxtGpuHint" TextWrapping="Wrap" FontSize="11" IsVisible="False"
+                               Foreground="{DynamicResource WarnBrush}" />
+                </StackPanel>
+                <Button x:Name="BtnRecheckGpu" Grid.Column="1" Content="重新检测" Classes="app"
+                        MinHeight="26" Padding="9,2" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- ================= 左右两栏 ================= -->
+        <Grid Grid.Row="1" ColumnDefinitions="430,8,*">
+
+            <!-- 左：导入 / 模型与设置 / 标题 -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="8">
+
+                    <Border Classes="group">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="groupTitle" Text="① 导入压缩包" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox x:Name="TxtArchive" IsReadOnly="True" Watermark="尚未选择压缩包" />
+                                <Button x:Name="BtnPickArchive" Grid.Column="1" Content="选择…"
+                                        Classes="primary" MinWidth="76" MinHeight="30" Margin="8,0,0,0" />
+                            </Grid>
+                            <TextBlock x:Name="TxtArchiveInfo" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="支持 zip / cbz / rar / cbr / 7z / cb7 / tar。导入后先解压到临时目录，关闭窗口即清理。" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="group">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="groupTitle" Text="② 模型与超分设置" />
+
+                            <ComboBox x:Name="CmbModel" HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate><TextBlock Text="{Binding Label}" /></DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock x:Name="TxtModelDesc" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock x:Name="TxtModelState" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="BtnDownload" Content="一键下载引擎 + 模型" Classes="primary"
+                                        MinHeight="28" Padding="10,3" />
+                                <Button x:Name="BtnDownloadPage" Content="下载页" Classes="app"
+                                        MinHeight="28" Padding="10,3" />
+                                <Button x:Name="BtnRemoveModel" Content="删除自定义" Classes="app"
+                                        MinHeight="28" Padding="9,2" IsVisible="False" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Button x:Name="BtnImportPack" Content="导入引擎包" Classes="app"
+                                        MinHeight="26" Padding="9,2"
+                                        ToolTip.Tip="选择 Real-ESRGAN 的 Windows 便携版 zip（下载页里那个约 43MB 的包）" />
+                                <Button x:Name="BtnImportModel" Content="导入模型" Classes="app"
+                                        MinHeight="26" Padding="9,2"
+                                        ToolTip.Tip="导入 ncnn 模型（.param + .bin）；.pth/.onnx 需先用 chaiNNer 等工具转换" />
+                                <Button x:Name="BtnModelDb" Content="OpenModelDB" Classes="app"
+                                        MinHeight="26" Padding="9,2"
+                                        ToolTip.Tip="社区超分模型库（参考/挑选模型用；ncnn 模型可直接导入）" />
+                            </StackPanel>
+                            <ProgressBar x:Name="DownloadBar" Height="4" Minimum="0" Maximum="1"
+                                         IsVisible="False" />
+                            <TextBlock x:Name="TxtDownload" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextTertiaryBrush}" />
+
+                            <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto,Auto">
+                                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="放大倍率" />
+                                    <ComboBox x:Name="CmbScale" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="2" Spacing="3">
+                                    <TextBlock Classes="fieldLabel" Text="显存瓦片（0 = 自动）" />
+                                    <ComboBox x:Name="CmbTile" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Spacing="3" Margin="0,6,0,0">
+                                    <TextBlock Classes="fieldLabel" Text="显卡（Vulkan 设备）" />
+                                    <ComboBox x:Name="CmbGpu" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="0" Spacing="3" Margin="0,6,0,0">
+                                    <TextBlock Classes="fieldLabel" Text="输出长边上限（0 = 不限）" />
+                                    <TextBox x:Name="TxtMaxLongSide" Watermark="0" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Spacing="14" Margin="0,4,0,0">
+                                <CheckBox x:Name="ChkTta" Content="TTA（质量优先，慢数倍）" />
+                                <CheckBox x:Name="ChkSkipFailed" Content="单页失败时跳过" />
+                            </StackPanel>
+
+                            <TextBlock Classes="fieldLabel" Text="输出目录（空 = 与压缩包同目录）" Margin="0,4,0,0" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox x:Name="TxtOutputDir" Watermark="默认与压缩包同目录" />
+                                <Button x:Name="BtnOutputDir" Grid.Column="1" Content="浏览"
+                                        Classes="app" MinWidth="60" MinHeight="30" Margin="8,0,0,0" />
+                            </Grid>
+                            <TextBlock x:Name="TxtSizeEstimate" FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextTertiaryBrush}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 右：页序检查 + 预览 + 标题/元信息 -->
+            <Border Grid.Column="2" Classes="group">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,6">
+                        <TextBlock x:Name="TxtPagesSummary" Classes="groupTitle"
+                                   Text="③ 检查图片顺序（尚未导入压缩包）" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button x:Name="BtnUp" Content="上移" Classes="app" MinHeight="26" Padding="9,2" IsEnabled="False" />
+                            <Button x:Name="BtnDown" Content="下移" Classes="app" MinHeight="26" Padding="9,2" IsEnabled="False" />
+                            <Button x:Name="BtnReverse" Content="反转" Classes="app" MinHeight="26" Padding="9,2" IsEnabled="False" />
+                            <Button x:Name="BtnSortName" Content="按文件名重排" Classes="app" MinHeight="26" Padding="9,2" IsEnabled="False" />
+                            <Button x:Name="BtnSortArchive" Content="按压缩包顺序重排" Classes="app" MinHeight="26" Padding="9,2" IsEnabled="False" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Grid Grid.Row="1" RowDefinitions="*,Auto">
+                        <Grid ColumnDefinitions="*,12,300">
+                            <ListBox x:Name="LstPages" Background="Transparent" BorderThickness="0"
+                                     SelectionMode="Single">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="44,*,96,86" Margin="2,1">
+                                            <TextBlock Text="{Binding IndexText}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextTertiaryBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Text="{Binding SizeText}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            <TextBlock Grid.Column="3" Text="{Binding DimsText}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Border Grid.Column="2" Background="{DynamicResource PanelBgBrush}"
+                                    BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="8">
+                                <Grid RowDefinitions="Auto,*">
+                                    <TextBlock Text="预览" FontSize="11" Margin="2,0,0,6"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <Border Grid.Row="1" Background="{DynamicResource PlaceholderBgBrush}"
+                                            CornerRadius="6" ClipToBounds="True">
+                                        <Image x:Name="PreviewImage" Stretch="Uniform" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <TextBlock Grid.Row="1" x:Name="TxtOrderHint" FontSize="11" TextWrapping="Wrap"
+                                   Margin="0,6,0,0" Foreground="{DynamicResource TextTertiaryBrush}"
+                                   Text="导入后可逐页核对；默认按文件名自然排序（2 在 10 之前），也可改成压缩包内原始顺序或手动上移/下移。" />
+                    </Grid>
+
+                    <StackPanel Grid.Row="2" Spacing="6" Margin="0,10,0,0">
+                        <TextBlock Classes="groupTitle" Text="④ 标题与元信息" />
+                        <Grid ColumnDefinitions="2*,12,*,12,*">
+                            <StackPanel Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="标题（必填，同时作为 CBZ 文件名）" />
+                                <TextBox x:Name="TxtTitle" Watermark="例如：葬送的芙莉莲 第 1 卷" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="系列（默认同标题）" />
+                                <TextBox x:Name="TxtSeries" Watermark="可留空" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="4" Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="作者" />
+                                <TextBox x:Name="TxtWriter" Watermark="可留空" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="90,12,150,12,*">
+                            <StackPanel Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="卷号" />
+                                <TextBox x:Name="TxtVolume" Watermark="可留空" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="语言" />
+                                <ComboBox x:Name="CmbLanguage" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="4" Spacing="3">
+                                <TextBlock Classes="fieldLabel" Text="简介（可选）" />
+                                <TextBox x:Name="TxtSummary" Watermark="写入 ComicInfo.xml 的 Summary" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ================= 底栏 ================= -->
+        <Border Grid.Row="2" Margin="0,8,0,0" Padding="10,8"
+                Background="{DynamicResource PanelBgBrush}" CornerRadius="8"
+                BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+            <Grid RowDefinitions="Auto,Auto">
+                <Grid ColumnDefinitions="*,Auto">
+                    <ProgressBar x:Name="Bar" Grid.Column="0" Minimum="0" Maximum="1" Value="0"
+                                 Height="10" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TxtProgress" Grid.Column="1" Margin="10,0,0,0" FontSize="12"
+                               VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </Grid>
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                    <TextBlock x:Name="TxtStatus" VerticalAlignment="Center" FontSize="12"
+                               TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="选好压缩包和模型后点「开始超分」。" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="BtnStart" Content="开始超分并导出 CBZ" Classes="primary"
+                                MinWidth="170" MinHeight="32" IsEnabled="False" />
+                        <Button x:Name="BtnCancelTask" Content="取消任务" Classes="app"
+                                MinWidth="86" MinHeight="32" IsEnabled="False" />
+                        <Button x:Name="BtnClose" Content="关闭" Classes="app" MinWidth="80" MinHeight="32" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

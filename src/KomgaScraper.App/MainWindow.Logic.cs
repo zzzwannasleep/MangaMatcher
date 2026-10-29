@@ -1235,4 +1235,53 @@ public sealed partial class MainWindow
         }
         _contextSeries = null;
     }
+
+    // ---- 图片超分（压缩包 → GPU 超分 → WebP 95 → CBZ） ----
+
+    /// <summary>
+    /// 打开图片超分窗口。功能独立于 Komga，不需要连接库；引擎/模型按需下载到 data\upscale。
+    /// 关闭窗口后把模型/倍率/输出目录等偏好写回设置，下次打开保持。
+    /// </summary>
+    private async Task OpenUpscaleAsync(string? initialArchive = null)
+    {
+        if (!GuardBusy()) return;
+        var dlg = new UpscaleWindow(_settings, Log, initialArchive);
+        await dlg.ShowDialog(this);
+        if (!dlg.Changed) return;
+
+        _settings.UpscaleModel = dlg.LastModelId;
+        _settings.UpscaleScale = dlg.LastScale;
+        _settings.UpscaleTile = dlg.LastTile;
+        _settings.UpscaleTta = dlg.LastTta;
+        _settings.UpscaleGpuId = dlg.LastGpuId;
+        _settings.UpscaleMaxLongSide = dlg.LastMaxLongSide;
+        _settings.UpscaleOutputDir = dlg.LastOutputDir;
+        _settings.UpscaleSkipFailed = dlg.LastSkipFailed;
+        _settings.UpscaleLanguage = dlg.LastLanguage;
+        SaveSettings();
+    }
+
+    /// <summary>
+    /// 启动参数里带漫画压缩包（把文件拖到 exe 上）时，自动打开超分窗口并载入。
+    /// 只认存在的 zip/cbz/rar/cbr/7z/cb7/tar，不影响正常启动。
+    /// </summary>
+    private async Task TryOpenStartupArchiveAsync()
+    {
+        try
+        {
+            var archive = Environment.GetCommandLineArgs()
+                .Skip(1)
+                .FirstOrDefault(a => !string.IsNullOrWhiteSpace(a)
+                                     && !a.StartsWith('-')
+                                     && KomgaScraper.Core.Upscale.ComicArchiveReader.IsSupportedArchive(a)
+                                     && File.Exists(a));
+            if (archive is null) return;
+            Log("INFO", $"[超分] 启动参数指定了压缩包，直接打开超分窗口：{archive}");
+            await OpenUpscaleAsync(archive);
+        }
+        catch (Exception e)
+        {
+            Log("WARN", $"[超分] 打开启动压缩包失败：{e.Message}");
+        }
+    }
 }

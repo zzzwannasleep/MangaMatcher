@@ -43,6 +43,10 @@ jobs:
       - name: Run dedupe smoke test
         run: dotnet run --project tests/DedupeSmokeTest/DedupeSmokeTest.csproj -c Release
 
+      # 图片超分：页序/解压/WebP/CBZ/模型管理/任务失败处理全走自测（不联网、不真跑 GPU）
+      - name: Run upscale smoke test
+        run: dotnet run --project tests/UpscaleSmokeTest/UpscaleSmokeTest.csproj -c Release
+
       - name: Publish
         run: >
           dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj
