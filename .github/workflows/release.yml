@@ -39,6 +39,10 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      # 跨库重复清理会真删文件：把核心自测当门禁，dry-run 零请求 / 只删清理库 / 部分失败 都必须过
+      - name: Run dedupe smoke test
+        run: dotnet run --project tests/DedupeSmokeTest/DedupeSmokeTest.csproj -c Release
+
       - name: Publish
         run: >
           dotnet publish src/KomgaScraper.App/KomgaScraper.App.csproj

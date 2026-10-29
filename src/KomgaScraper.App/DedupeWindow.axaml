@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="KomgaScraper.App.DedupeWindow"
         Title="重复清理 — 跨库同尺寸去重"
-        Width="1160" Height="720" MinWidth="960" MinHeight="580"
+        Width="1200" Height="720" MinWidth="1000" MinHeight="580"
         WindowStartupLocation="CenterOwner"
         FontFamily="Microsoft YaHei UI, PingFang SC, Segoe UI"
         Background="{DynamicResource AppBgBrush}">
@@ -59,14 +59,12 @@
         <!-- ================= 结果区 ================= -->
         <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,8,0,0">
             <Grid ColumnDefinitions="*,Auto" Margin="2,0,2,6">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock x:Name="TxtSummary" Text="尚未扫描：选好两个库后点「扫描重复」"
-                               VerticalAlignment="Center" TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                <TextBlock x:Name="TxtSummary" Grid.Column="0" Text="尚未扫描：选好两个库后点「扫描重复」"
+                           VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <ProgressBar x:Name="BusyBar" IsIndeterminate="True" IsVisible="False"
-                                 Width="120" Height="6" VerticalAlignment="Center" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                 Width="100" Height="6" VerticalAlignment="Center" />
                     <Button x:Name="BtnSelectAll" Content="全选可删" Classes="app" MinHeight="26" Padding="9,2"
                             IsEnabled="False" />
                     <Button x:Name="BtnSelectNone" Content="全不选" Classes="app" MinHeight="26" Padding="9,2"

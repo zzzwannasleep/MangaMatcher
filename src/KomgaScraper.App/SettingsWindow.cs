@@ -587,6 +587,11 @@ public sealed class SettingsWindow : Window
         Theme = _current.Theme,
         LastLibraryId = _current.LastLibraryId,
         MylarOutputDir = _current.MylarOutputDir,
+        // 重复清理的偏好不在设置页里改，但保存设置时必须原样带过去，否则会被默认值冲掉
+        DedupeKeepLibraryId = _current.DedupeKeepLibraryId,
+        DedupeCleanLibraryId = _current.DedupeCleanLibraryId,
+        DedupeMode = _current.DedupeMode,
+        DedupeMatch = _current.DedupeMatch,
         TagWhitelist = SplitLines(_txtTagWhitelist.Text ?? ""),
         TagBlacklist = SplitLines(_txtTagBlacklist.Text ?? ""),
         BaikeEnabled = _chkBaike.IsChecked == true,

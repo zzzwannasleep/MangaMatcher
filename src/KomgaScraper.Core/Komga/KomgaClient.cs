@@ -47,7 +47,7 @@ public sealed class KomgaClient : IDisposable
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req)
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken ct = default)
     {
         // 重试前置快照：HttpRequestMessage 发过一次就不能复用，先把方法/地址/正文备份，
         // 网络抖动时用快照重建请求再打一次（正文是字节数组，JSON 查询与 multipart 封面都适用）。
@@ -74,10 +74,11 @@ public sealed class KomgaClient : IDisposable
             }
             try
             {
-                resp = await _http.SendAsync(attemptReq).ConfigureAwait(false);
+                resp = await _http.SendAsync(attemptReq, ct).ConfigureAwait(false);
                 break;
             }
-            catch (Exception e) when (attempt < 3 && (e is HttpRequestException || e is TaskCanceledException))
+            catch (Exception e) when (attempt < 3 && !ct.IsCancellationRequested &&
+                                      (e is HttpRequestException || e is TaskCanceledException))
             {
                 // 网络级异常（SSL 被掐/DNS 抖动/连接超时）→ 最多重试 3 次（1.5s/4s 退避）；
                 // 这里没有外部 ct，TaskCanceledException 只可能是 HttpClient 超时（非用户取消）。
@@ -111,7 +112,7 @@ public sealed class KomgaClient : IDisposable
 
     public async Task<List<LibraryDto>> GetLibrariesAsync(CancellationToken ct = default)
     {
-        var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, "v1/libraries")).ConfigureAwait(false);
+        var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, "v1/libraries"), ct).ConfigureAwait(false);
         var list = await resp.Content.ReadFromJsonAsync<List<LibraryDto>>(JsonOpts, ct).ConfigureAwait(false);
         return list ?? [];
     }
@@ -130,7 +131,7 @@ public sealed class KomgaClient : IDisposable
         {
             var payload = KomgaQuery.SeriesInLibrary(libraryId);
             var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Post,
-                $"v1/series/list?size={size}&page={page}") { Content = JsonContent.Create(payload) })
+                $"v1/series/list?size={size}&page={page}") { Content = JsonContent.Create(payload) }, ct)
                 .ConfigureAwait(false);
             var data = await resp.Content.ReadFromJsonAsync<PageDto<SeriesDto>>(JsonOpts, ct).ConfigureAwait(false);
             if (data != null && data.TotalElements > LastSeriesTotalElements)
@@ -145,7 +146,7 @@ public sealed class KomgaClient : IDisposable
 
     public async Task<SeriesDto> GetSeriesAsync(string seriesId, CancellationToken ct = default)
     {
-        var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, $"v1/series/{seriesId}")).ConfigureAwait(false);
+        var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, $"v1/series/{seriesId}"), ct).ConfigureAwait(false);
         var s = await resp.Content.ReadFromJsonAsync<SeriesDto>(JsonOpts, ct).ConfigureAwait(false);
         return s ?? throw new KomgaApiException($"系列 {seriesId} 数据为空", resp.StatusCode);
     }
@@ -154,7 +155,7 @@ public sealed class KomgaClient : IDisposable
     {
         try
         {
-            var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, $"v1/series/{seriesId}/metadata"))
+            var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, $"v1/series/{seriesId}/metadata"), ct)
                 .ConfigureAwait(false);
             return await resp.Content.ReadFromJsonAsync<SeriesMetadataDto>(JsonOpts, ct).ConfigureAwait(false);
         }
@@ -172,7 +173,7 @@ public sealed class KomgaClient : IDisposable
         var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Patch, $"v1/series/{seriesId}/metadata")
         {
             Content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json")
-        }).ConfigureAwait(false);
+        }, ct).ConfigureAwait(false);
         resp.Dispose();
     }
 
@@ -182,7 +183,7 @@ public sealed class KomgaClient : IDisposable
         var payload = KomgaQuery.BooksInSeries(seriesId);
         var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Post,
             "v1/books/list?unpaged=true&sort=metadata.numberSort,asc")
-        { Content = JsonContent.Create(payload) }).ConfigureAwait(false);
+        { Content = JsonContent.Create(payload) }, ct).ConfigureAwait(false);
         var data = await resp.Content.ReadFromJsonAsync<PageDto<BookDto>>(JsonOpts, ct).ConfigureAwait(false);
         return data?.Content ?? [];
     }
@@ -193,16 +194,22 @@ public sealed class KomgaClient : IDisposable
         var all = new List<BookDto>();
         const int size = 2000;
         var page = 0;
+        long? total = null;
         while (true)
         {
             var payload = KomgaQuery.BooksInLibrary(libraryId);
             var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Post,
                 $"v1/books/list?size={size}&page={page}")
-            { Content = JsonContent.Create(payload) }).ConfigureAwait(false);
+            { Content = JsonContent.Create(payload) }, ct).ConfigureAwait(false);
             var data = await resp.Content.ReadFromJsonAsync<PageDto<BookDto>>(JsonOpts, ct).ConfigureAwait(false);
             var content = data?.Content ?? [];
             all.AddRange(content);
-            if (content.Count < size) break;
+            if (data != null && data.TotalElements > 0) total = data.TotalElements;
+            // 以服务器 totalElements 为准：服务端若把 size 夹到更小（spring max-page-size 等），
+            // 不能因为 content.Count < size 就提前收工 —— 否则拿到的是部分书，会让"整部重复"误判。
+            if (content.Count == 0) break;
+            if (total.HasValue && all.Count >= total.Value) break;
+            if (!total.HasValue && content.Count < size) break;
             page++;
         }
         return all;
@@ -211,22 +218,37 @@ public sealed class KomgaClient : IDisposable
     /// <summary>删除单册文件（DELETE /books/{id}/file，ADMIN；Komga 返回 202，删除异步完成）。</summary>
     public async Task DeleteBookFileAsync(string bookId, CancellationToken ct = default)
     {
-        using var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"v1/books/{bookId}/file"))
-            .ConfigureAwait(false);
+        try
+        {
+            using var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"v1/books/{bookId}/file"), ct)
+                .ConfigureAwait(false);
+        }
+        catch (KomgaApiException e) when (e.Status == HttpStatusCode.NotFound)
+        {
+            // 重试/并发下文件可能已被删掉：404 视为已完成，不打断整批
+            _log.Info($"[重复清理] 删除单册 {bookId}：服务器返回 404（已不存在，按已删除处理）");
+        }
     }
 
     /// <summary>删除整部系列的全部书籍文件（DELETE /series/{id}/file，ADMIN；202 异步）。</summary>
     public async Task DeleteSeriesFileAsync(string seriesId, CancellationToken ct = default)
     {
-        using var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"v1/series/{seriesId}/file"))
-            .ConfigureAwait(false);
+        try
+        {
+            using var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"v1/series/{seriesId}/file"), ct)
+                .ConfigureAwait(false);
+        }
+        catch (KomgaApiException e) when (e.Status == HttpStatusCode.NotFound)
+        {
+            _log.Info($"[重复清理] 删除系列 {seriesId}：服务器返回 404（已不存在，按已删除处理）");
+        }
     }
 
     /// <summary>全库关键词搜索系列（GET /series?search=…，编辑器的搜索栏用；跨库，返回含各库系列）。</summary>
     public async Task<List<SeriesDto>> SearchSeriesAsync(string query, int size = 50, CancellationToken ct = default)
     {
         var url = $"v1/series?search={Uri.EscapeDataString(query)}&size={size}&page=0";
-        var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, url)).ConfigureAwait(false);
+        var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Get, url), ct).ConfigureAwait(false);
         var data = await resp.Content.ReadFromJsonAsync<PageDto<SeriesDto>>(JsonOpts, ct).ConfigureAwait(false);
         return data?.Content ?? [];
     }

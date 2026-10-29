@@ -1204,9 +1204,34 @@ public sealed partial class MainWindow
 
         if (dlg.DeletedCount > 0)
         {
-            Log("INFO", $"[重复清理] 已删除 {dlg.DeletedCount} 项，后台对齐清理库缓存…");
+            // Komga 的删除是 202 异步任务：立刻 Refresh 会把还没删完的系列又拉回来，
+            // 所以先把确认删掉的整部系列从本地缓存/列表里剔除，再等一会儿后台对齐。
+            if (dlg.DeletedSeriesIds.Count > 0)
+            {
+                _libCache?.RemoveSeries(dlg.DeletedSeriesIds);
+                var gone = new HashSet<string>(dlg.DeletedSeriesIds, StringComparer.Ordinal);
+                foreach (var id in gone) _seriesCache.Remove(id);
+                for (var i = _rows.Count - 1; i >= 0; i--)
+                {
+                    if (gone.Contains(_rows[i].Series.Id)) _rows.RemoveAt(i);
+                }
+                Log("INFO", $"[重复清理] 已从本地缓存移除 {dlg.DeletedSeriesIds.Count} 部已删系列");
+            }
+
             var clean = _libraries.FirstOrDefault(l => l.Id == _settings.DedupeCleanLibraryId);
-            if (clean != null && _libCache != null) _ = SilentRefreshLibraryAsync(clean);
+            if (clean != null && _libCache != null)
+            {
+                Log("INFO", $"[重复清理] 已删除 {dlg.DeletedCount} 项，稍后后台对齐清理库「{clean.Name}」…");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(6));   // 等 Komga 后台删除任务落地
+                        await SilentRefreshLibraryAsync(clean);
+                    }
+                    catch { /* 对齐失败不影响结果，下次定时对齐兜底 */ }
+                });
+            }
         }
         _contextSeries = null;
     }

@@ -60,6 +60,7 @@ public sealed partial class DedupeWindow : Window
     private readonly Action<string, string> _log;
     private readonly IAppLogger _logger;
     private readonly ObservableCollection<DedupeRowVm> _rows = [];
+    private readonly HashSet<string> _deletedSeriesIds = new(StringComparer.Ordinal);
     private DuplicateCleaner? _cleaner;
     private LibraryDto? _planKeep;    // 本次扫描对应的两个库（执行时只认它们，防止改下拉框后删错库）
     private LibraryDto? _planClean;
@@ -67,13 +68,15 @@ public sealed partial class DedupeWindow : Window
     private bool _busy;
     private bool _ready;
 
-    /// <summary>窗口关闭后由主界面读取：记住上次选择 + 是否需要刷新库视图。</summary>
+    /// <summary>窗口关闭后由主界面读取：记住上次选择 + 刷新库视图。</summary>
     public string LastKeepLibraryId { get; private set; } = "";
     public string LastCleanLibraryId { get; private set; } = "";
     public string LastMode { get; private set; } = "series";
     public string LastMatch { get; private set; } = "pages";
-    /// <summary>真实删除成功的项数（>0 时主界面对清理库做一次后台对齐）。</summary>
+    /// <summary>真实删除成功的项数（>0 时主界面做缓存整理/后台对齐）。</summary>
     public int DeletedCount { get; private set; }
+    /// <summary>真实删除成功的整部系列 id（主界面立即从本地缓存剔除，避免列表残留）。</summary>
+    public IReadOnlyCollection<string> DeletedSeriesIds => _deletedSeriesIds;
 
     public DedupeWindow(KomgaClient komga, IReadOnlyList<LibraryDto> libraries, Action<string, string> log,
         bool defaultDryRun, string keepId, string cleanId, string mode, string match)
@@ -85,12 +88,18 @@ public sealed partial class DedupeWindow : Window
 
         CmbKeep.ItemsSource = libraries;
         CmbClean.ItemsSource = libraries;
-        CmbKeep.SelectedIndex = FindLibraryIndex(libraries, keepId, 0);
-        CmbClean.SelectedIndex = FindLibraryIndex(libraries, cleanId, 1);
+        // 只在记得的库还存在时预选；旧配置里没有就留空（避免"随便预选两个库"被一键扫描+删除）
+        CmbKeep.SelectedIndex = FindLibraryIndex(libraries, keepId);
+        CmbClean.SelectedIndex = FindLibraryIndex(libraries, cleanId);
 
         CmbMode.ItemsSource = new[] { "整部系列（全册都重复才删，推荐）", "逐册（只删重复的册）" };
         CmbMode.SelectedIndex = mode == "book" ? 1 : 0;
-        CmbMatch.ItemsSource = new[] { "大小 + 页数（推荐）", "仅文件大小", "大小 + 页数 + 文件哈希" };
+        CmbMatch.ItemsSource = new[]
+        {
+            "大小 + 页数（推荐，有哈希时按哈希）",
+            "仅文件大小",
+            "大小 + 页数 + 哈希（要求双方都有）",
+        };
         CmbMatch.SelectedIndex = match switch { "size" => 1, "hash" => 2, _ => 0 };
 
         ChkDryRun.IsChecked = defaultDryRun;
@@ -106,7 +115,11 @@ public sealed partial class DedupeWindow : Window
         CmbMatch.SelectionChanged += (_, _) => OnOptionChanged();
         CmbKeep.SelectionChanged += (_, _) => OnOptionChanged();
         CmbClean.SelectionChanged += (_, _) => OnOptionChanged();
-        Closing += (_, _) => _cts?.Cancel();
+        Closing += (_, _) =>
+        {
+            _cts?.Cancel();
+            RememberChoices();
+        };
 
         _ready = true;
         UpdateSelection();
@@ -132,14 +145,27 @@ public sealed partial class DedupeWindow : Window
         _ => "pages",
     };
 
-    private static int FindLibraryIndex(IReadOnlyList<LibraryDto> libraries, string id, int fallback)
+    /// <summary>只在记得的库 id 命中时返回下标；否则 -1（下拉框留空，由用户自己选）。</summary>
+    private static int FindLibraryIndex(IReadOnlyList<LibraryDto> libraries, string id)
     {
+        if (string.IsNullOrWhiteSpace(id)) return -1;
         for (var i = 0; i < libraries.Count; i++)
             if (libraries[i].Id == id) return i;
-        return libraries.Count > fallback ? fallback : (libraries.Count > 0 ? 0 : -1);
+        return -1;
     }
 
-    /// <summary>扫描后改粒度/判定强度 → 旧结果作废，必须重扫（避免用旧清单删错东西）。</summary>
+    private void RememberChoices()
+    {
+        if (CmbKeep.SelectedItem is LibraryDto keep && CmbClean.SelectedItem is LibraryDto clean)
+        {
+            LastKeepLibraryId = keep.Id;
+            LastCleanLibraryId = clean.Id;
+        }
+        LastMode = ModeKey;
+        LastMatch = MatchKey;
+    }
+
+    /// <summary>扫描后改粒度/判定强度/库 → 旧结果作废，必须重扫（避免用旧清单删错东西）。</summary>
     private void OnOptionChanged()
     {
         if (!_ready || _busy || _rows.Count == 0) return;
@@ -171,18 +197,21 @@ public sealed partial class DedupeWindow : Window
         {
             _cleaner = new DuplicateCleaner(_komga, _logger);
             var plan = await _cleaner.ScanAsync(keep, clean, options, _cts.Token);
+            if (!IsVisible) return;
 
             foreach (var vm in _rows) vm.PropertyChanged -= OnRowChanged;
             _rows.Clear();
             foreach (var c in plan.Candidates)
             {
-                var vm = new DedupeRowVm(c, c.Selectable);
+                // 默认不勾选：扫描只负责列清单，真要删请点「全选可删」再逐行确认
+                var vm = new DedupeRowVm(c, isChecked: false);
                 vm.PropertyChanged += OnRowChanged;
                 _rows.Add(vm);
             }
 
             TxtSummary.Text = plan.Summary;
-            if (plan.Candidates.Count == 0) TxtSummary.Text += "（两个库之间没有同尺寸的书）";
+            if (plan.Candidates.Count == 0 && !plan.CleanAllSizesUnknown)
+                TxtSummary.Text += "（两个库之间没有同尺寸的书）";
 
             _planKeep = keep;
             _planClean = clean;
@@ -190,6 +219,9 @@ public sealed partial class DedupeWindow : Window
             LastCleanLibraryId = clean.Id;
             LastMode = ModeKey;
             LastMatch = MatchKey;
+
+            if (plan.CleanAllSizesUnknown)
+                await Ui.ErrorAsync(this, plan.Summary, "无法比较");
         }
         catch (OperationCanceledException)
         {
@@ -199,11 +231,11 @@ public sealed partial class DedupeWindow : Window
         {
             TxtSummary.Text = $"扫描失败：{e.Message}";
             _log("ERR ", $"[重复清理] 扫描失败：{e.Message}");
-            await Ui.ErrorAsync(this, e.Message, "扫描失败");
+            if (IsVisible) await Ui.ErrorAsync(this, e.Message, "扫描失败");
         }
         finally
         {
-            _cts.Dispose();
+            _cts?.Dispose();
             _cts = null;
             SetBusy(false, null);
         }
@@ -242,46 +274,72 @@ public sealed partial class DedupeWindow : Window
         try
         {
             var done = await _cleaner.ExecuteAsync(selected.Select(r => r.Candidate), dryRun, _cts.Token);
-            if (!dryRun) DeletedCount += done;
+            var failed = selected.Count - done;
+
+            if (!dryRun)
+            {
+                DeletedCount += done;
+                CollectDeleted(_cleaner.LastSucceeded);
+                RemoveRows(_cleaner.LastSucceeded);   // 只移除真正删成功的行
+            }
+
             TxtSummary.Text = dryRun
                 ? $"Dry-run 预览完成：{done} 项（详见主窗口日志，未删除任何文件）"
-                : $"已删除 {done} 项（详见主窗口日志）";
+                : failed > 0
+                    ? $"已删除 {done} 项，{failed} 项失败（失败项仍保留在列表里，详见日志）"
+                    : $"已删除 {done} 项（详见主窗口日志）";
 
-            if (!dryRun && done == selected.Count)
-            {
-                foreach (var vm in selected)
-                {
-                    vm.PropertyChanged -= OnRowChanged;
-                    _rows.Remove(vm);
-                }
-            }
+            if (!IsVisible) return;
             await Ui.InfoAsync(this,
                 dryRun
                     ? $"Dry-run 完成：预览 {done} 项，未删除任何文件。\n详见主窗口日志。"
-                    : $"删除完成：{done} 项。\n详见主窗口日志。\n\n" +
-                      "Komga 的删除是后台任务，删完若库里还显示空系列，等任务结束在该库菜单" +
+                    : $"删除完成：{done} 项。\n" +
+                      (failed > 0 ? $"\n{failed} 项失败（多为权限/网络问题），失败项仍保留在列表，可重试。\n" : "") +
+                      "\nKomga 的删除是后台任务，删完若库里还显示空系列，等任务结束在该库菜单" +
                       "执行「清空回收站 / Empty trash」即可从列表里清掉。",
                 dryRun ? "预览完成" : "完成");
         }
         catch (OperationCanceledException)
         {
-            // 取消时已经删掉的部分也要计入，主界面关闭后仍会刷新库缓存
-            if (!dryRun) DeletedCount += _cleaner.LastRunCount;
+            // 取消时已经删掉的部分也要计入，主界面关闭后仍会整理缓存
+            if (!dryRun)
+            {
+                DeletedCount += _cleaner.LastRunCount;
+                CollectDeleted(_cleaner.LastSucceeded);
+                RemoveRows(_cleaner.LastSucceeded);
+            }
             TxtSummary.Text = $"已取消（已处理 {_cleaner.LastRunCount} 项）";
         }
         catch (Exception e)
         {
             TxtSummary.Text = $"删除失败：{e.Message}";
             _log("ERR ", $"[重复清理] 删除失败：{e.Message}");
-            await Ui.ErrorAsync(this, e.Message, "删除失败");
+            if (IsVisible) await Ui.ErrorAsync(this, e.Message, "删除失败");
         }
         finally
         {
-            _cts.Dispose();
+            _cts?.Dispose();
             _cts = null;
             SetBusy(false, null);
         }
         UpdateSelection();
+    }
+
+    private void CollectDeleted(IEnumerable<DedupeCandidate> succeeded)
+    {
+        foreach (var c in succeeded)
+            if (c.Kind == DedupeKind.Series) _deletedSeriesIds.Add(c.DeleteId);
+    }
+
+    private void RemoveRows(IEnumerable<DedupeCandidate> succeeded)
+    {
+        var set = new HashSet<DedupeCandidate>(succeeded);
+        if (set.Count == 0) return;
+        foreach (var vm in _rows.Where(r => set.Contains(r.Candidate)).ToList())
+        {
+            vm.PropertyChanged -= OnRowChanged;
+            _rows.Remove(vm);
+        }
     }
 
     // ================= 勾选与状态 =================
@@ -338,8 +396,8 @@ public sealed partial class DedupeWindow : Window
             TxtSelected.Text = _rows.Count == 0
                 ? "未选择任何项"
                 : partial > 0 && Mode == DedupeMode.WholeSeries
-                    ? $"未选择任何项（{partial} 部只重复了一部分，整部模式不处理；切「逐册」可逐册删）"
-                    : "未选择任何项";
+                    ? $"未选择任何项（{partial} 部只重复了一部分/册数不完整，整部模式不处理；切「逐册」可逐册删）"
+                    : "未选择任何项（勾选左侧方框，或点「全选可删」）";
         }
         else
         {
@@ -352,6 +410,7 @@ public sealed partial class DedupeWindow : Window
         _busy = busy;
         BusyBar.IsVisible = busy;
         CmbKeep.IsEnabled = CmbClean.IsEnabled = CmbMode.IsEnabled = CmbMatch.IsEnabled = !busy;
+        RowsGrid.IsEnabled = !busy;   // 扫描/删除中禁止改勾选
         BtnScan.IsEnabled = !busy;
         BtnSelectAll.IsEnabled = !busy && _rows.Any(r => r.Selectable);
         BtnSelectNone.IsEnabled = !busy && _rows.Count > 0;

@@ -693,7 +693,7 @@ public sealed partial class MainWindow : Window
     {
         _busy = busy;
         foreach (var b in new[] { BtnTest, BtnLoad, BtnSettings, BtnScrapeMeta, BtnScrapeAll, BtnManualMatch,
-                     BtnCoverScrape, BtnRematch, BtnFolderTag, BtnMylarExport, BtnExportLog })
+                     BtnCoverScrape, BtnRematch, BtnFolderTag, BtnMylarExport, BtnExportLog, BtnDedupe })
             b.IsEnabled = !busy;
         BtnCancel.IsEnabled = busy;
         BtnCancel.Opacity = busy ? 1 : 0.55;

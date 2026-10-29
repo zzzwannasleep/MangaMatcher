@@ -178,6 +178,26 @@ public sealed class LibraryCache
         SaveToDisk();
     }
 
+    /// <summary>
+    /// 立即移除已确认不存在的系列（重复清理删掉后调用）。Komga 的删除是异步的，
+    /// 马上去 RefreshLibraryAsync 反而会把还没删完的系列又拉回缓存，所以先本地剔除。
+    /// </summary>
+    public void RemoveSeries(IReadOnlyCollection<string> seriesIds)
+    {
+        if (seriesIds.Count == 0) return;
+        var removed = 0;
+        lock (_gate)
+        {
+            foreach (var id in seriesIds)
+            {
+                if (!_series.Remove(id)) continue;
+                removed++;
+                foreach (var ids in _byLib.Values) ids.Remove(id);
+            }
+        }
+        if (removed > 0) SaveToDisk();
+    }
+
     /// <summary>仅回填库列表（连接测试成功后；不触碰已缓存的系列数据）。</summary>
     public void SetLibraries(List<LibraryDto> libs, string connKey)
     {
