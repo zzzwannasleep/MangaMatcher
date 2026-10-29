@@ -85,12 +85,15 @@ public sealed partial class UpscaleWindow : Window
     private bool _ready;
     private bool _gpuAcknowledged;
     private bool _closingConfirmed;
+    private bool _closeInProgress;
+    private bool _forceClose;
     private string? _sessionDir;
     private string _archivePath = "";
     private ImageSortMode _sortMode = ImageSortMode.NaturalName;
     private bool _manualOrder;
     private Bitmap? _preview;
     private string _previewKey = "";
+    private CancellationTokenSource? _previewCts;
 
     // ---- 关闭后由主界面保存的偏好 ----
     public bool Changed { get; private set; }
@@ -132,7 +135,7 @@ public sealed partial class UpscaleWindow : Window
         CmbLanguage.SelectedIndex = langIndex >= 0 ? langIndex : 0;
 
         TxtMaxLongSide.Text = settings.UpscaleMaxLongSide > 0
-            ? settings.UpscaleMaxLongSide.ToString(CultureInfo.InvariantCulture)
+            ? Math.Clamp(settings.UpscaleMaxLongSide, 1, WebpTranscoder.MaxWebpSide).ToString(CultureInfo.InvariantCulture)
             : "0";
         TxtOutputDir.Text = settings.UpscaleOutputDir;
         ChkTta.IsChecked = settings.UpscaleTta;
@@ -245,6 +248,7 @@ public sealed partial class UpscaleWindow : Window
     {
         var recommended = VulkanProbe.FindBestDevice(_devices, _gpu?.PreferredName);
         _autoGpuIndex = recommended ?? (_devices.Count > 0 ? _devices[0].Index : null);
+        var previous = CmbGpu.SelectedItem as GpuChoice;
 
         _gpuChoices.Clear();
         var autoLabel = recommended is { } autoIndex
@@ -258,11 +262,16 @@ public sealed partial class UpscaleWindow : Window
 
         CmbGpu.ItemsSource = null;
         CmbGpu.ItemsSource = _gpuChoices;
-        var saved = _settings.UpscaleGpuId;
         var index = 0;
-        if (saved >= 0)
+        if (previous?.Id is { } previousId)
         {
-            var found = _gpuChoices.FindIndex(c => c.Id == saved);
+            // 重新检测/重装引擎时保留用户本次手动选的设备，不要悄悄切回「自动」
+            var found = _gpuChoices.FindIndex(c => c.Id == previousId);
+            if (found >= 0) index = found;
+        }
+        else if (previous is null && _settings.UpscaleGpuId >= 0)
+        {
+            var found = _gpuChoices.FindIndex(c => c.Id == _settings.UpscaleGpuId);
             if (found >= 0) index = found;
         }
         CmbGpu.SelectedIndex = index;
@@ -330,12 +339,25 @@ public sealed partial class UpscaleWindow : Window
         TxtModelDesc.Text = model.Description +
                             $"\n原生倍率：{model.ScalesText} · 模型体积：{ComicArchiveReader.FormatBytes(model.ApproxBytes)}";
         BtnRemoveModel.IsVisible = model.Kind == UpscaleModelKind.Custom;
+        BtnRemoveModel.IsEnabled = model.Kind == UpscaleModelKind.Custom;
         UpdateEstimate();
         RefreshModelState();
     }
 
     private void RefreshModelState()
     {
+        if (!UpscaleRuntime.PlatformSupported)
+        {
+            TxtModelState.Text = "当前系统暂不支持图片超分（引擎仅有 Windows 便携版）；请使用 Windows 版。";
+            TxtModelState.Foreground = ThemeBrush("WarnBrush") ?? TxtModelState.Foreground;
+            BtnDownload.Content = "仅 Windows 支持";
+            BtnDownload.IsEnabled = false;
+            BtnImportPack.IsEnabled = false;
+            BtnImportModel.IsEnabled = false;
+            UpdateStartState();
+            return;
+        }
+
         var model = SelectedModel;
         var scale = SelectedScale;
         if (model is null)
@@ -382,18 +404,12 @@ public sealed partial class UpscaleWindow : Window
         }
 
         var page = _pages[0].Page;
-        var scale = SelectedScale;
-        long w = (long)page.Width * scale;
-        long h = (long)page.Height * scale;
-        var cap = ParseInt(TxtMaxLongSide.Text);
-        if (cap > 0 && Math.Max(w, h) > cap)
-        {
-            var ratio = (double)cap / Math.Max(w, h);
-            w = Math.Max(1, (long)Math.Round(w * ratio));
-            h = Math.Max(1, (long)Math.Round(h * ratio));
-        }
+        var (w, h) = UpscaleJob.EffectiveOutputSize(page.Width, page.Height, SelectedScale, ParseInt(TxtMaxLongSide.Text));
+        var warning = Math.Max(w, h) > WebpTranscoder.MaxWebpSide
+            ? $"　⚠ 超过 WebP 单边上限 {WebpTranscoder.MaxWebpSide}，请设置长边上限"
+            : "";
         TxtSizeEstimate.Text = page.Width > 0
-            ? $"预计第 1 页输出：{w}×{h}（WebP q95；整部体积取决于页数与画面复杂度）"
+            ? $"预计第 1 页输出：{w}×{h}（WebP q95）{warning}；整部体积取决于页数与画面复杂度"
             : "";
     }
 
@@ -424,6 +440,7 @@ public sealed partial class UpscaleWindow : Window
     private async Task LoadArchiveAsync(string path)
     {
         if (_busy) return;
+        path = Path.GetFullPath(path);
         var dir = Path.Combine(Path.GetTempPath(), "KomgaScraper-upscale-session", Guid.NewGuid().ToString("N"));
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
@@ -462,8 +479,12 @@ public sealed partial class UpscaleWindow : Window
                 $"最大 {maxW}×{maxH} · 已按文件名自然排序（可改）";
             TxtPagesSummary.Text = $"③ 检查图片顺序（共 {pages.Count} 页）";
 
-            if (string.IsNullOrWhiteSpace(TxtTitle.Text))
-                TxtTitle.Text = ImageOrder.SanitizeFileName(Path.GetFileNameWithoutExtension(path));
+            // 每次导入都重置为本压缩包的标题并清空册级元信息，避免沿用上一本导致错档
+            TxtTitle.Text = ImageOrder.SanitizeFileName(Path.GetFileNameWithoutExtension(path));
+            TxtSeries.Text = "";
+            TxtVolume.Text = "";
+            TxtWriter.Text = "";
+            TxtSummary.Text = "";
 
             LstPages.SelectedIndex = 0;
             UpdateOrderButtons(true);
@@ -476,12 +497,14 @@ public sealed partial class UpscaleWindow : Window
         }
         catch (OperationCanceledException)
         {
-            TxtArchiveInfo.Text = "解压已取消";
             TryDeleteDir(dir);
+            ResetAfterImportFailure();
+            TxtArchiveInfo.Text = "解压已取消";
         }
         catch (Exception e)
         {
             TryDeleteDir(dir);
+            ResetAfterImportFailure();
             TxtArchiveInfo.Text = $"导入失败：{e.Message}";
             _log("ERR ", $"[超分] 导入失败：{e.Message}");
             if (IsVisible) await Ui.ErrorAsync(this, e.Message, "导入失败");
@@ -565,20 +588,41 @@ public sealed partial class UpscaleWindow : Window
 
     private async Task UpdatePreviewAsync()
     {
+        _previewCts?.Cancel();
+        _previewCts?.Dispose();
+        _previewCts = new CancellationTokenSource();
+        var token = _previewCts.Token;
+
         if (LstPages.SelectedItem is not UpscalePageVm vm)
         {
-            _previewKey = "";
-            _preview?.Dispose();
-            _preview = null;
-            PreviewImage.Source = null;
+            ClearPreview();
+            TxtPreviewNote.IsVisible = false;
             return;
         }
 
         var key = vm.Page.FilePath;
         if (key == _previewKey) return;
         _previewKey = key;
-        var bmp = await Task.Run(() => RenderPreview(key));
-        if (!IsVisible || _previewKey != key)
+
+        // 超大图只解码缩略图也可能吃掉几百 MB：直接跳过预览，避免点一下就把内存打爆
+        if ((long)vm.Page.Width * vm.Page.Height > 40_000_000)
+        {
+            ClearPreview();
+            TxtPreviewNote.IsVisible = true;
+            return;
+        }
+        TxtPreviewNote.IsVisible = false;
+
+        Bitmap? bmp;
+        try
+        {
+            bmp = await Task.Run(() => RenderPreview(key, token), token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        if (token.IsCancellationRequested || !IsVisible || _previewKey != key)
         {
             bmp?.Dispose();
             return;
@@ -589,26 +633,58 @@ public sealed partial class UpscaleWindow : Window
         old?.Dispose();
     }
 
-    private static Bitmap? RenderPreview(string path)
+    private void ClearPreview()
+    {
+        _previewKey = "";
+        var old = _preview;
+        _preview = null;
+        PreviewImage.Source = null;
+        old?.Dispose();
+    }
+
+    private static Bitmap? RenderPreview(string path, CancellationToken ct)
     {
         try
         {
+            ct.ThrowIfCancellationRequested();
             using var img = ISImage.Load(path);
+            ct.ThrowIfCancellationRequested();
             img.Mutate(x => x.Resize(new ResizeOptions
             {
                 Mode = ResizeMode.Max,
                 Size = new SixLabors.ImageSharp.Size(280, 440),
                 Sampler = KnownResamplers.Lanczos3,
             }));
+            ct.ThrowIfCancellationRequested();
             using var ms = new MemoryStream();
             img.SaveAsPng(ms);
             ms.Position = 0;
             return new Bitmap(ms);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return null;
         }
+    }
+
+    /// <summary>导入失败/取消后把界面恢复到「没有导入」状态，避免用户误导出上一本。</summary>
+    private void ResetAfterImportFailure()
+    {
+        CleanupSession();
+        ClearPreview();
+        TxtPreviewNote.IsVisible = false;
+        _pages.Clear();
+        _archivePath = "";
+        TxtArchive.Text = "";
+        TxtPagesSummary.Text = "③ 检查图片顺序（尚未导入压缩包）";
+        TxtStatus.Text = "导入失败，请换一个压缩包重试。";
+        TxtSizeEstimate.Text = "";
+        UpdateOrderButtons(false);
+        UpdateStartState();
     }
 
     // ================= 引擎/模型安装 =================
@@ -780,6 +856,11 @@ public sealed partial class UpscaleWindow : Window
     private async Task StartAsync()
     {
         if (_busy) return;
+        if (!UpscaleRuntime.PlatformSupported)
+        {
+            await Ui.ErrorAsync(this, "图片超分目前只支持 Windows（引擎是 Real-ESRGAN 的 Windows 便携版）。", "无法开始");
+            return;
+        }
         var model = SelectedModel;
         if (model is null)
         {
@@ -970,7 +1051,7 @@ public sealed partial class UpscaleWindow : Window
         BtnImportPack.IsEnabled = enable;
         BtnImportModel.IsEnabled = enable;
         BtnModelDb.IsEnabled = enable;
-        BtnRemoveModel.IsEnabled = enable;
+        BtnRemoveModel.IsEnabled = enable && SelectedModel?.Kind == UpscaleModelKind.Custom;
         TxtMaxLongSide.IsEnabled = enable;
         ChkTta.IsEnabled = enable;
         ChkSkipFailed.IsEnabled = enable;
@@ -985,6 +1066,12 @@ public sealed partial class UpscaleWindow : Window
         BtnRecheckGpu.IsEnabled = enable;
         LstPages.IsEnabled = enable;
         UpdateOrderButtons(_pages.Count > 0);
+        if (!UpscaleRuntime.PlatformSupported)
+        {
+            BtnDownload.IsEnabled = false;
+            BtnImportPack.IsEnabled = false;
+            BtnImportModel.IsEnabled = false;
+        }
 
         BtnClose.IsEnabled = true;
         if (status is not null) TxtStatus.Text = status;
@@ -994,26 +1081,73 @@ public sealed partial class UpscaleWindow : Window
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (_busy && !_closingConfirmed)
+        if (_busy && !_forceClose)
         {
             e.Cancel = true;
-            _ = ConfirmCloseWhileBusyAsync();
+            _ = CancelThenCloseAsync();
             return;
         }
         if (_busy) _cts?.Cancel();
         SavePreferences();
-        CleanupSession();
+        _previewCts?.Cancel();
+        ClearPreview();
+        if (!_busy) CleanupSession();
+        else ScheduleSessionCleanup();
     }
 
-    private async Task ConfirmCloseWhileBusyAsync()
+    /// <summary>取消任务后等它真正退出（最多 15 秒）再关窗；避免边跑边删会话目录导致临时文件泄漏。</summary>
+    private async Task CancelThenCloseAsync()
     {
-        var ok = await Ui.MessageAsync(this, "正在超分/下载/解压，关闭窗口会取消当前任务。确定关闭？",
-            "取消任务并关闭", error: true);
-        if (!ok) return;
-        _closingConfirmed = true;
-        _cts?.Cancel();
-        await Task.Delay(400);
-        Close();
+        if (_closeInProgress) return;
+        _closeInProgress = true;
+        try
+        {
+            if (!_closingConfirmed)
+            {
+                var ok = await Ui.MessageAsync(this, "正在超分/下载/解压，关闭窗口会取消当前任务。确定关闭？",
+                    "取消任务并关闭", error: true);
+                if (!ok) return;
+                _closingConfirmed = true;
+            }
+
+            _cts?.Cancel();
+            for (var i = 0; i < 150 && _busy; i++) await Task.Delay(100);
+
+            if (_busy)
+            {
+                _log("WARN", "[超分] 任务未在 15 秒内退出，强制关闭窗口；临时文件会在后台重试清理。");
+                _forceClose = true;
+            }
+            Close();
+        }
+        finally
+        {
+            _closeInProgress = false;
+        }
+    }
+
+    /// <summary>任务还没完全停下就关窗时，后台延迟重试删除会话目录。</summary>
+    private void ScheduleSessionCleanup()
+    {
+        var dir = _sessionDir;
+        _sessionDir = null;
+        if (dir is null) return;
+        _ = Task.Run(async () =>
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                try
+                {
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                    return;
+                }
+                catch
+                {
+                    await Task.Delay(1000);
+                }
+            }
+            _log("WARN", $"[超分] 临时目录清理失败，可手动删除：{dir}");
+        });
     }
 
     private void SavePreferences()
@@ -1047,7 +1181,7 @@ public sealed partial class UpscaleWindow : Window
         var t = (text ?? "").Trim();
         var digits = new string(t.TakeWhile(char.IsDigit).ToArray());
         if (!int.TryParse(digits, out var v)) return 0;
-        return Math.Clamp(v, 0, 20000);
+        return Math.Clamp(v, 0, WebpTranscoder.MaxWebpSide);
     }
 
     // ================= 拖拽 =================

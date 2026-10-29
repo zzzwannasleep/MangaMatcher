@@ -81,6 +81,7 @@ internal static class Program
         Check("文件名清洗", ImageOrder.SanitizeFileName("a/b:c*?") == "a_b_c__");
         Check("空标题回退", ImageOrder.SanitizeFileName("   ") == "未命名");
         Check("设备名避开", ImageOrder.SanitizeFileName("CON") == "CON_");
+        Check("设备名带扩展名也避开", ImageOrder.SanitizeFileName("CON.v2") == "CON_.v2");
     }
 
     // ================= 解压 =================
@@ -162,6 +163,15 @@ internal static class Program
         var capped = Path.Combine(_root, "capped.webp");
         var (cw, ch) = WebpTranscoder.Encode(src, capped, 95, 200);
         Check("长边上限生效", Math.Max(cw, ch) == 200 && cw < 400 && ch < 600);
+
+        // 证明用的是「有损」编码：同一张噪声图 q100 必须明显大于 q95
+        var noise = Path.Combine(_root, "noise.png");
+        File.WriteAllBytes(noise, PngNoise(500, 500));
+        var q95 = Path.Combine(_root, "q95.webp");
+        var q100 = Path.Combine(_root, "q100.webp");
+        WebpTranscoder.Encode(noise, q95, 95, 0);
+        WebpTranscoder.Encode(noise, q100, 100, 0);
+        Check("WebP 有损：q95 比 q100 小", new FileInfo(q95).Length < new FileInfo(q100).Length);
     }
 
     // ================= CBZ / Job =================
@@ -285,6 +295,32 @@ internal static class Program
                 new UpscaleOptions { Scale = 4 }, new UpscaleMetadata("过大"), Path.Combine(_root, "out-huge"),
                 null, CancellationToken.None),
             "超大输出被提前拦截");
+
+        // 长边上限必须参与判定：3000×4000 4x = 12000×16000 会被拒，但上限 6000 → 4500×6000 应放行
+        var (gw, gh) = UpscaleJob.EffectiveOutputSize(3000, 4000, 4, 6000);
+        Check("长边上限折算输出尺寸", gw == 4500 && gh == 6000);
+        var big = new List<UpscalePageInput>
+        {
+            new(pages[0].FilePath, "big.png", 100, 3000, 4000),
+        };
+        var cappedResult = await dupJob.RunAsync(big, model,
+            new UpscaleOptions { Scale = 4, MaxLongSide = 6000 },
+            new UpscaleMetadata("长边上限"), Path.Combine(_root, "out-capped"), null, CancellationToken.None);
+        Check("设置长边上限后可正常超分", File.Exists(cappedResult.OutputPath));
+
+        // 空输出目录在 Core 层就必须拒绝，不能把 CBZ 写进会话临时目录
+        await ExpectThrowsAsync<ArgumentException>(() => dupJob.RunAsync(pages, model,
+                new UpscaleOptions { Scale = 4 }, new UpscaleMetadata("无目录"), "", null, CancellationToken.None),
+            "空输出目录被拒绝");
+
+        // CBZ 写到一半取消：不能留下 .part / 半成品
+        var cancelTarget = Path.Combine(_root, "cancel", "x.cbz");
+        using var cbzCts = new CancellationTokenSource();
+        cbzCts.Cancel();
+        await ExpectThrowsAsync<OperationCanceledException>(() => CbzWriter.WriteAsync(
+                cancelTarget, [pages[0].FilePath], "<ComicInfo />", cbzCts.Token),
+            "CBZ 取消抛出取消异常");
+        Check("CBZ 取消不留半成品", !File.Exists(cancelTarget) && !File.Exists(cancelTarget + ".part"));
     }
 
     // ================= 模型目录 / 运行时 =================
@@ -324,10 +360,22 @@ internal static class Program
 
         var root = Path.Combine(_root, "runtime");
         var runtime = new UpscaleRuntime(root);
+        Check("平台能力与系统一致", UpscaleRuntime.PlatformSupported == OperatingSystem.IsWindows());
         Check("安装前未就绪", !runtime.EngineReady && runtime.InstalledVersion == "未安装");
 
         await runtime.InstallPackFromZipAsync(packZip, NullLogger.Instance);
         Check("安装后引擎就绪", runtime.EngineReady && runtime.InstalledVersion == UpscaleRuntime.PackVersion);
+
+        // 坏包（只有 exe、没有 models）不能把已装引擎弄坏
+        var versionBefore = runtime.InstalledVersion;
+        var badPack = Path.Combine(_root, "badpack.zip");
+        using (var z = ZipFile.Open(badPack, ZipArchiveMode.Create))
+            AddEntry(z, "realesrgan-ncnn-vulkan.exe", "BAD"u8.ToArray());
+        await ExpectThrowsAsync<UpscalePackException>(
+            () => runtime.InstallPackFromZipAsync(badPack, NullLogger.Instance), "坏包被拒绝");
+        Check("坏包不弄坏旧引擎",
+            runtime.EngineReady && runtime.InstalledVersion == versionBefore &&
+            File.ReadAllText(runtime.ExePath) == "MZfake");
         Check("轻量 2x 就绪", runtime.IsModelReady(UpscaleModelCatalog.Find(UpscaleModelCatalog.LightweightId)!, 2));
         Check("特化 4x 就绪", runtime.IsModelReady(UpscaleModelCatalog.Find(UpscaleModelCatalog.SpecializedId)!, 4));
         Check("轻量 3x 缺文件（zip 里没放）",
@@ -364,6 +412,19 @@ internal static class Program
         Check("自定义模型避开官方 id",
             collide.Id != UpscaleModelCatalog.GeneralId &&
             runtime.IsModelReady(UpscaleModelCatalog.Find(UpscaleModelCatalog.GeneralId)!, 4));
+
+        // 手工塞进来的侧车文件不能带路径穿越
+        File.WriteAllText(Path.Combine(runtime.ModelsDir, "evil.model.json"),
+            "{\"id\":\"../evil\",\"displayName\":\"evil\",\"scale\":4}");
+        File.WriteAllText(Path.Combine(runtime.ModelsDir, "evil.param"), "7767517");
+        File.WriteAllBytes(Path.Combine(runtime.ModelsDir, "evil.bin"), new byte[2048]);
+        Check("拒绝越界/非法自定义模型 id",
+            !runtime.CustomModels().Any(m => m.DisplayName == "evil"));
+        Check("模型 id 白名单",
+            UpscaleRuntime.IsSafeModelId("my_model-2") &&
+            !UpscaleRuntime.IsSafeModelId("../x") &&
+            !UpscaleRuntime.IsSafeModelId("a/b") &&
+            !UpscaleRuntime.IsSafeModelId("CON"));
     }
 
     // ================= 显卡 =================
@@ -384,7 +445,9 @@ internal static class Program
                         GpuDetector.VendorOf("PCI\\VEN_8086&DEV_1") == "intel");
 
         var report = GpuDetector.Detect();   // 真机调用不应抛异常
-        Check("Detect 返回结果", report.Adapters.Count >= 0);
+        Check("Detect 返回可读说明", report.Summary.Length > 0 && report.Advice.Length > 0);
+        if (OperatingSystem.IsWindows())
+            Check("Windows 能枚举显示适配器", report.Adapters.Count > 0);
         if (OperatingSystem.IsWindows())
         {
             Console.WriteLine($"    本机：{report.Summary}");
@@ -444,6 +507,20 @@ internal static class Program
     private static byte[] Png(int w, int h, int r, int g, int b)
     {
         using var img = new Image<Rgba32>(w, h, new Rgba32((byte)r, (byte)g, (byte)b));
+        using var ms = new MemoryStream();
+        img.SaveAsPng(ms);
+        return ms.ToArray();
+    }
+
+    /// <summary>高频噪声图：用来证明 WebP 走的是有损编码（q95 应明显小于 q100）。</summary>
+    private static byte[] PngNoise(int w, int h)
+    {
+        using var img = new Image<Rgba32>(w, h);
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+            img[x, y] = new Rgba32((byte)((x * 37 + y * 17) & 255),
+                (byte)((x * 13 + y * 29) & 255),
+                (byte)((x * 7 + y * 11) & 255));
         using var ms = new MemoryStream();
         img.SaveAsPng(ms);
         return ms.ToArray();

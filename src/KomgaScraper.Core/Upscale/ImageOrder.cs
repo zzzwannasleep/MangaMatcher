@@ -136,8 +136,11 @@ public static class ImageOrder
         if (name.Length == 0) name = fallback;
         if (name.Length > 100) name = name[..100].TrimEnd('.', ' ');
         if (name.Length == 0) name = fallback;
-        // CON / NUL / COM1 这类设备名在 Windows 上无法作为文件名
-        if (ReservedNames.Contains(name)) name += "_";
+        // CON / NUL / COM1 这类设备名在 Windows 上无法作为文件名（含扩展名也一样，按第一个点前的 stem 判断）
+        var dot = name.IndexOf('.');
+        var stem = dot >= 0 ? name[..dot] : name;
+        if (ReservedNames.Contains(stem))
+            name = stem + "_" + (dot >= 0 ? name[dot..] : "");
         return name;
     }
 

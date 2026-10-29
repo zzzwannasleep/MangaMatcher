@@ -23,6 +23,12 @@ public sealed record ExtractedPage(
 /// </summary>
 public static class ComicArchiveReader
 {
+    /// <summary>单张图片解压上限（扫描件通常 &lt;50MB；超过基本是异常或 zip bomb）。</summary>
+    private const long MaxEntryBytes = 256L * 1024 * 1024;
+
+    /// <summary>整包解压总量上限，防止 zip bomb 写满磁盘。</summary>
+    private const long MaxTotalBytes = 20L * 1024 * 1024 * 1024;
+
     private static readonly string[] Extensions =
         [".zip", ".cbz", ".rar", ".cbr", ".7z", ".cb7", ".tar"];
 
@@ -73,6 +79,15 @@ public static class ComicArchiveReader
         catch (OperationCanceledException)
         {
             throw;
+        }
+        catch (InvalidDataException)
+        {
+            throw;   // 自己的大小上限/坏包提示已经说清楚了，不要再套一层
+        }
+        catch (IOException e)
+        {
+            throw new IOException(
+                $"解压失败：写入临时目录出错（磁盘空间不足或目录不可写？）：{e.Message}", e);
         }
         catch (Exception e) when (e is not NotSupportedException and not FileNotFoundException)
         {
@@ -130,24 +145,34 @@ public static class ComicArchiveReader
     {
         using var zip = ZipFile.OpenRead(archivePath);
         var entries = zip.Entries;
-        var total = entries.Count;
-        var index = 0;
+        var total = entries.Count(e => !IsDirEntry(e.FullName) && IsImageEntry(e.FullName));
+        var done = 0;
+        long totalBytes = 0;
         foreach (var entry in entries)
         {
             ct.ThrowIfCancellationRequested();
-            index++;
-            if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\')) continue;
+            if (IsDirEntry(entry.FullName)) continue;
             if (!TryPrepare(entry.FullName, destDir, used, out var relative, out var dest)) continue;
-            if (!ImageOrder.IsImageFile(relative)) continue;
 
-            progress?.Invoke(index, total, relative);
+            var declared = entry.Length;
+            if (declared > MaxEntryBytes)
+                throw new InvalidDataException(
+                    $"压缩包里的单张图片过大（{FormatBytes(declared)}），超过上限 {FormatBytes(MaxEntryBytes)}。" +
+                    "请确认压缩包内容，或先解压后重新打包。");
+
+            progress?.Invoke(Math.Max(1, Math.Min(done + 1, Math.Max(1, total))), Math.Max(1, total), relative);
             Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
             await using (var src = entry.Open())
             await using (var dst = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
             {
                 await src.CopyToAsync(dst, ct).ConfigureAwait(false);
             }
-            pages.Add(new ExtractedPage(relative, dest, new FileInfo(dest).Length, 0, 0));
+
+            var length = new FileInfo(dest).Length;
+            CheckEntrySize(length, totalBytes, relative);
+            totalBytes += length;
+            pages.Add(new ExtractedPage(relative, dest, length, 0, 0));
+            done++;
         }
     }
 
@@ -162,26 +187,53 @@ public static class ComicArchiveReader
     {
         using var archive = SharpCompress.Archives.ArchiveFactory.Open(archivePath);
         var entries = archive.Entries.ToList();
-        var total = entries.Count;
-        var index = 0;
+        var total = entries.Count(e => !e.IsDirectory && IsImageEntry(e.Key));
+        var done = 0;
+        long totalBytes = 0;
         foreach (var entry in entries)
         {
             ct.ThrowIfCancellationRequested();
-            index++;
             if (entry.IsDirectory) continue;
             var key = entry.Key ?? "";
             if (!TryPrepare(key, destDir, used, out var relative, out var dest)) continue;
-            if (!ImageOrder.IsImageFile(relative)) continue;
 
-            progress?.Invoke(index, total, relative);
+            if (entry.Size > MaxEntryBytes)
+                throw new InvalidDataException(
+                    $"压缩包里的单张图片过大（{FormatBytes(entry.Size)}），超过上限 {FormatBytes(MaxEntryBytes)}。");
+
+            progress?.Invoke(Math.Max(1, Math.Min(done + 1, Math.Max(1, total))), Math.Max(1, total), relative);
             Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
             await using (var src = entry.OpenEntryStream())
             await using (var dst = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
             {
                 await src.CopyToAsync(dst, ct).ConfigureAwait(false);
             }
-            pages.Add(new ExtractedPage(relative, dest, new FileInfo(dest).Length, 0, 0));
+
+            var length = new FileInfo(dest).Length;
+            CheckEntrySize(length, totalBytes, relative);
+            totalBytes += length;
+            pages.Add(new ExtractedPage(relative, dest, length, 0, 0));
+            done++;
         }
+    }
+
+    private static bool IsDirEntry(string? name) =>
+        name is not null && (name.EndsWith('/') || name.EndsWith('\\'));
+
+    private static bool IsImageEntry(string? name) =>
+        ImageOrder.TryNormalizeRelativePath(name, out var normalized) &&
+        !ImageOrder.IsJunk(normalized) &&
+        ImageOrder.IsImageFile(normalized);
+
+    private static void CheckEntrySize(long length, long totalBytes, string relative)
+    {
+        if (length > MaxEntryBytes)
+            throw new InvalidDataException(
+                $"压缩包里的单张图片过大（{relative}：{FormatBytes(length)}），超过上限 {FormatBytes(MaxEntryBytes)}。");
+        if (totalBytes + length > MaxTotalBytes)
+            throw new InvalidDataException(
+                $"解压总量超过上限 {FormatBytes(MaxTotalBytes)}（到 {relative} 时已超）。" +
+                "压缩包可能是异常文件（zip bomb），请检查内容。");
     }
 
     /// <summary>校验路径安全 + 过滤垃圾 + 处理重名；返回 false 表示这条记录直接忽略。</summary>

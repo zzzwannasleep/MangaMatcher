@@ -161,7 +161,14 @@
                                                Foreground="{DynamicResource TextSecondaryBrush}" />
                                     <Border Grid.Row="1" Background="{DynamicResource PlaceholderBgBrush}"
                                             CornerRadius="6" ClipToBounds="True">
-                                        <Image x:Name="PreviewImage" Stretch="Uniform" />
+                                        <Grid>
+                                            <Image x:Name="PreviewImage" Stretch="Uniform" />
+                                            <TextBlock x:Name="TxtPreviewNote" Text="图片像素过大，已跳过预览"
+                                                       FontSize="11" TextWrapping="Wrap" TextAlignment="Center"
+                                                       Margin="12" IsVisible="False"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextTertiaryBrush}" />
+                                        </Grid>
                                     </Border>
                                 </Grid>
                             </Border>

@@ -30,6 +30,8 @@ public sealed class UpscaleRuntime
     public const string PackUrl =
         "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip";
     public const long PackBytes = 45_474_481;
+    /// <summary>官方 Windows 便携包的 SHA-256（2026-10 实测）；下载后必须校验，防止被替换成可执行木马。</summary>
+    public const string PackSha256 = "ABC02804E17982A3BE33675E4D471E91EA374E65B70167ABC09E31ACB412802D";
     public const string DownloadPageUrl = "https://github.com/xinntao/Real-ESRGAN/releases/tag/v0.2.5.0";
     public const string ModelDatabaseUrl = "https://openmodeldb.info/";
     public const string ProjectUrl = "https://github.com/xinntao/Real-ESRGAN";
@@ -50,6 +52,9 @@ public sealed class UpscaleRuntime
     public string EngineDir => Path.Combine(Root, "engine");
     public string ModelsDir => Path.Combine(Root, "models");
     public string ExePath => Path.Combine(EngineDir, "realesrgan-ncnn-vulkan.exe");
+
+    /// <summary>引擎是 Real-ESRGAN 的 Windows 便携版；其它系统直接提示不支持，避免白下 43MB。</summary>
+    public static bool PlatformSupported => OperatingSystem.IsWindows();
 
     public bool EngineReady => File.Exists(ExePath);
 
@@ -76,6 +81,26 @@ public sealed class UpscaleRuntime
     {
         var custom = Environment.GetEnvironmentVariable("KOMGASCRAPE_UPSCALE_PACK_URL");
         return string.IsNullOrWhiteSpace(custom) ? PackUrl : custom;
+    }
+
+    /// <summary>校验下载包；官方地址用固定哈希，自定义镜像可用 KOMGASCRAPE_UPSCALE_PACK_SHA256 覆盖（设为 skip 跳过）。</summary>
+    public static string ResolvePackSha256()
+    {
+        var custom = Environment.GetEnvironmentVariable("KOMGASCRAPE_UPSCALE_PACK_SHA256");
+        return string.IsNullOrWhiteSpace(custom) ? PackSha256 : custom.Trim();
+    }
+
+    /// <summary>模型 id 安全校验：只允许小写字母/数字/点/下划线/短横线，禁止路径分隔与上跳。</summary>
+    public static bool IsSafeModelId(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 64) return false;
+        if (id.Contains("..", StringComparison.Ordinal)) return false;
+        foreach (var ch in id)
+        {
+            if (ch is >= 'a' and <= 'z' or >= '0' and <= '9' or '.' or '_' or '-') continue;
+            return false;
+        }
+        return char.IsLetterOrDigit(id[0]);
     }
 
     // ================= 模型文件 =================
@@ -126,7 +151,9 @@ public sealed class UpscaleRuntime
             try
             {
                 var meta = JsonSerializer.Deserialize<CustomModelMeta>(File.ReadAllText(json), JsonOpts);
-                if (meta is null || meta.Id.Length == 0 || meta.Scale is < 2 or > 4) continue;
+                if (meta is null || meta.Scale is < 2 or > 4) continue;
+                // 侧车文件可能是手工/第三方放进去的：id 必须过白名单，且不能顶替官方模型
+                if (!IsSafeModelId(meta.Id) || UpscaleModelCatalog.Find(meta.Id) is not null) continue;
                 var param = Path.Combine(ModelsDir, meta.Id + ".param");
                 var bin = Path.Combine(ModelsDir, meta.Id + ".bin");
                 if (!File.Exists(param) || !File.Exists(bin)) continue;
@@ -203,7 +230,7 @@ public sealed class UpscaleRuntime
 
     public bool RemoveCustomModel(string id)
     {
-        if (string.IsNullOrWhiteSpace(id) || UpscaleModelCatalog.Find(id) is not null) return false;
+        if (!IsSafeModelId(id) || UpscaleModelCatalog.Find(id) is not null) return false;
         var removed = false;
         foreach (var path in new[]
                  {
@@ -254,6 +281,8 @@ public sealed class UpscaleRuntime
         CancellationToken ct)
     {
         var url = ResolvePackUrl();
+        if (!PlatformSupported)
+            throw new UpscalePackException("图片超分目前只支持 Windows：引擎是 Real-ESRGAN 的 Windows 便携版（Vulkan）。");
         var tempDir = Path.Combine(Path.GetTempPath(), "KomgaScraper-upscale");
         Directory.CreateDirectory(tempDir);
         var zipPath = Path.Combine(tempDir, $"engine-{Guid.NewGuid():N}.zip");
@@ -292,8 +321,30 @@ public sealed class UpscaleRuntime
                 throw new UpscalePackException(
                     $"下载的文件不完整（{ComicArchiveReader.FormatBytes(received)}，正常约 43 MB）。" +
                     "可能是网络被中断，请重试或手动下载 zip 后导入。");
+            if (resp.Content.Headers.ContentLength is { } declaredLength && received != declaredLength)
+                throw new UpscalePackException(
+                    $"下载被截断（收到 {received} / {declaredLength} 字节），请重试或手动下载 zip 后导入。");
 
-            log.Info($"[超分] 引擎包下载完成（{ComicArchiveReader.FormatBytes(received)}），正在安装…");
+            // 这个 zip 里的 exe 会被执行：必须校验官方 SHA-256（自定义镜像可用环境变量覆盖）
+            var expectedHash = ResolvePackSha256();
+            if (!expectedHash.Equals("skip", StringComparison.OrdinalIgnoreCase))
+            {
+                string actualHash;
+                await using (var fs = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+                {
+                    actualHash = Convert.ToHexString(await System.Security.Cryptography.SHA256
+                        .HashDataAsync(fs, ct).ConfigureAwait(false));
+                }
+                if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new UpscalePackException(
+                        "引擎包 SHA-256 校验失败：文件可能被篡改或下载到了错误的版本。\n" +
+                        $"实际：{actualHash}\n期望：{expectedHash}\n" +
+                        $"请从官方下载页重新下载：{DownloadPageUrl}");
+                }
+            }
+
+            log.Info($"[超分] 引擎包下载完成（{ComicArchiveReader.FormatBytes(received)}，SHA-256 校验通过），正在安装…");
             await InstallPackFromZipAsync(zipPath, log, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -319,10 +370,14 @@ public sealed class UpscaleRuntime
     /// <summary>安装本地 zip（官方 Windows 便携包，或用户手动下载的同一个包）。</summary>
     public async Task InstallPackFromZipAsync(string zipPath, IAppLogger log, CancellationToken ct = default)
     {
+        if (!PlatformSupported)
+            throw new UpscalePackException("图片超分目前只支持 Windows：引擎是 Real-ESRGAN 的 Windows 便携版（Vulkan）。");
         if (!File.Exists(zipPath))
             throw new UpscalePackException($"找不到引擎包文件：{zipPath}");
 
         var tmp = Path.Combine(Path.GetTempPath(), "KomgaScraper-upscale-pack", Guid.NewGuid().ToString("N"));
+        string? staging = null;
+        string? backup = null;
         try
         {
             await Task.Run(() =>
@@ -339,41 +394,68 @@ public sealed class UpscaleRuntime
                     $"请从下载页下载：{DownloadPageUrl}");
 
             var packDir = Path.GetDirectoryName(exe)!;
-            Directory.CreateDirectory(EngineDir);
-            Directory.CreateDirectory(ModelsDir);
+            var packModelsDir = Path.Combine(packDir, "models");
+            if (!Directory.Exists(packModelsDir))
+                throw new UpscalePackException("便携包里没有 models 文件夹，可能下载到了错误的文件。");
 
+            var modelFiles = Directory.EnumerateFiles(packModelsDir)
+                .Where(f => f.EndsWith(".param", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (modelFiles.Count == 0)
+                throw new UpscalePackException("便携包的 models 文件夹里没有 .param/.bin 模型文件。");
+
+            // 模型拷到独立目录（自定义模型也在那，不受引擎替换影响）；官方文件与旧版同名，覆盖即可
+            Directory.CreateDirectory(ModelsDir);
+            foreach (var file in modelFiles)
+                File.Copy(file, Path.Combine(ModelsDir, Path.GetFileName(file)), true);
+
+            // 组装新引擎到 staging，全部校验通过后才替换 EngineDir：坏包/截断包不会把旧引擎弄坏
+            Directory.CreateDirectory(Root);
+            staging = Path.Combine(Root, "engine.new-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(staging);
             var dlls = 0;
             foreach (var file in Directory.EnumerateFiles(packDir))
             {
                 var name = Path.GetFileName(file);
                 if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
                     !name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) continue;
-                File.Copy(file, Path.Combine(EngineDir, name), true);
+                File.Copy(file, Path.Combine(staging, name), true);
                 if (name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) dlls++;
             }
+            if (!File.Exists(Path.Combine(staging, "realesrgan-ncnn-vulkan.exe")))
+                throw new UpscalePackException("引擎 exe 复制失败，请检查软件目录写入权限。");
+            await File.WriteAllTextAsync(Path.Combine(staging, ".pack"), PackVersion, ct).ConfigureAwait(false);
 
-            var modelsDir = Path.Combine(packDir, "models");
-            if (!Directory.Exists(modelsDir))
-                throw new UpscalePackException("便携包里没有 models 文件夹，可能下载到了错误的文件。");
-
-            var models = 0;
-            foreach (var file in Directory.EnumerateFiles(modelsDir))
+            if (Directory.Exists(EngineDir))
             {
-                var name = Path.GetFileName(file);
-                if (!name.EndsWith(".param", StringComparison.OrdinalIgnoreCase) &&
-                    !name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) continue;
-                File.Copy(file, Path.Combine(ModelsDir, name), true);
-                models++;
+                backup = Path.Combine(Root, "engine.old-" + Guid.NewGuid().ToString("N"));
+                Directory.Move(EngineDir, backup);
             }
-            if (models == 0)
-                throw new UpscalePackException("便携包的 models 文件夹里没有 .param/.bin 模型文件。");
+            try
+            {
+                Directory.Move(staging, EngineDir);
+                staging = null;
+            }
+            catch
+            {
+                if (backup is not null && !Directory.Exists(EngineDir))
+                {
+                    try { Directory.Move(backup, EngineDir); backup = null; } catch { /* finally 再兜底 */ }
+                }
+                throw;
+            }
 
-            await File.WriteAllTextAsync(Path.Combine(EngineDir, ".pack"), PackVersion, ct).ConfigureAwait(false);
+            if (backup is not null)
+            {
+                try { Directory.Delete(backup, true); backup = null; }
+                catch (Exception e) { log.Warn($"[超分] 旧引擎备份清理失败（可手动删）：{backup}：{e.Message}"); }
+            }
 
             if (!EngineReady)
                 throw new UpscalePackException("安装后仍找不到 realesrgan-ncnn-vulkan.exe，请检查软件目录写入权限。");
 
-            log.Info($"[超分] 引擎安装完成：{EngineDir}（{dlls} 个 DLL，{models} 个模型文件）");
+            log.Info($"[超分] 引擎安装完成：{EngineDir}（{dlls} 个 DLL，{modelFiles.Count} 个模型文件）");
         }
         catch (OperationCanceledException)
         {
@@ -390,6 +472,22 @@ public sealed class UpscaleRuntime
         finally
         {
             try { if (Directory.Exists(tmp)) Directory.Delete(tmp, true); } catch { /* 忽略 */ }
+            if (staging is not null)
+            {
+                try { if (Directory.Exists(staging)) Directory.Delete(staging, true); } catch { /* 忽略 */ }
+            }
+            if (backup is not null)
+            {
+                // 替换失败时尽量把旧引擎还原，保证「导入坏包不弄坏可用引擎」
+                if (!Directory.Exists(EngineDir))
+                {
+                    try { Directory.Move(backup, EngineDir); } catch { /* 忽略 */ }
+                }
+                else
+                {
+                    try { Directory.Delete(backup, true); } catch { /* 忽略 */ }
+                }
+            }
         }
     }
 

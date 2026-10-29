@@ -35,6 +35,12 @@ public sealed class UpscaleProcessException(int exitCode, string stderrTail)
 /// </summary>
 public sealed class ProcessUpscalerRunner : IUpscalerRunner
 {
+    private readonly TimeSpan _pageTimeout;
+
+    /// <summary>单页超时默认 15 分钟：显存不足/驱动挂死时不会把整次任务永久卡住。</summary>
+    public ProcessUpscalerRunner(TimeSpan? pageTimeout = null) =>
+        _pageTimeout = pageTimeout ?? TimeSpan.FromMinutes(15);
+
     public static List<string> BuildArguments(UpscaleInvocation inv)
     {
         var args = new List<string>
@@ -108,10 +114,28 @@ public sealed class ProcessUpscalerRunner : IUpscalerRunner
             catch { /* 进程可能已经退出 */ }
         });
 
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (_pageTimeout > TimeSpan.Zero) timeout.CancelAfter(_pageTimeout);
+
         try
         {
-            await process.WaitForExitAsync(ct).ConfigureAwait(false);
-            process.WaitForExit();   // 等异步事件把 stderr 读完
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            // 异步事件读 stderr 可能还没排完；用带超时的同步等待兜底，绝不无限阻塞
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* 忽略 */ }
+                throw new UpscaleProcessException(-1, "引擎进程退出后仍有句柄阻塞，已强制结束。");
+            }
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+            }
+            catch { /* 忽略 */ }
+            throw new UpscaleProcessException(-1,
+                $"单页处理超过 {_pageTimeout.TotalMinutes:0} 分钟仍未结束（显存不足/驱动异常？），已强制结束。");
         }
         catch (OperationCanceledException)
         {

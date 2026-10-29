@@ -64,6 +64,27 @@ public sealed class UpscaleJobException(string message, Exception? inner = null)
 /// </summary>
 public sealed class UpscaleJob(UpscaleRuntime runtime, IUpscalerRunner runner, IAppLogger log)
 {
+    /// <summary>单页输出像素上限（约 120MP，4x 大跨页也够用；再大 ImageSharp 会吃光内存）。</summary>
+    private const long MaxOutputPixels = 120_000_000;
+
+    /// <summary>按倍率 + 长边上限折算实际输出尺寸（长边上限会先缩小，再判断上限）。</summary>
+    public static (long Width, long Height) EffectiveOutputSize(int width, int height, int scale, int maxLongSide)
+    {
+        long w = Math.Max(1, (long)width * scale);
+        long h = Math.Max(1, (long)height * scale);
+        if (maxLongSide > 0)
+        {
+            var longSide = Math.Max(w, h);
+            if (longSide > maxLongSide)
+            {
+                var ratio = (double)maxLongSide / longSide;
+                w = Math.Max(1, (long)Math.Round(w * ratio));
+                h = Math.Max(1, (long)Math.Round(h * ratio));
+            }
+        }
+        return (w, h);
+    }
+
     public async Task<UpscaleResult> RunAsync(
         IReadOnlyList<UpscalePageInput> pages,
         UpscaleModelInfo model,
@@ -86,24 +107,30 @@ public sealed class UpscaleJob(UpscaleRuntime runtime, IUpscalerRunner runner, I
                 $"模型「{model.DisplayName}」的文件缺失：{string.Join("、", runtime.MissingModelFiles(model, options.Scale))}\n" +
                 "请重新下载引擎包，或导入自己的模型。");
 
-        // 4x 之后像素会翻 16 倍：太夸张的页面先拦住，避免 ImageSharp 编码时吃光内存
-        var oversize = pages
-            .Where(p => p.Width > 0 && p.Height > 0)
-            .Select(p => (Page: p, W: (long)p.Width * options.Scale, H: (long)p.Height * options.Scale))
-            .Where(x => x.W * x.H > 120_000_000L)
-            .ToList();
+        // 4x 之后像素翻 16 倍：先按「长边上限」折算实际输出，再判断内存与 WebP 单边硬上限
+        var oversize = new List<string>();
+        foreach (var page in pages.Where(p => p.Width > 0 && p.Height > 0))
+        {
+            var (w, h) = EffectiveOutputSize(page.Width, page.Height, options.Scale, options.MaxLongSide);
+            if (Math.Max(w, h) > WebpTranscoder.MaxWebpSide)
+                oversize.Add($"{page.Name} → {w}×{h}（超过 WebP 单边上限 {WebpTranscoder.MaxWebpSide}）");
+            else if (w * h > MaxOutputPixels)
+                oversize.Add($"{page.Name} → {w}×{h}（{w * h:N0} 像素，超过 {MaxOutputPixels:N0}）");
+        }
         if (oversize.Count > 0)
         {
-            var sample = oversize[0];
             throw new UpscaleSetupException(
-                $"有 {oversize.Count} 页超分后像素过大（例如 {sample.Page.Name} → {sample.W}×{sample.H}），可能耗尽内存。\n" +
-                "请把「输出长边上限」设成 4000～6000，或改用 2x 后再试。");
+                $"有 {oversize.Count} 页输出过大，可能耗尽内存或超出 WebP 上限：\n" +
+                string.Join("\n", oversize.Take(3)) +
+                (oversize.Count > 3 ? $"\n…另 {oversize.Count - 3} 页" : "") +
+                "\n\n请把「输出长边上限」设成 6000 以下（推荐 4000～6000），或改用 2x。");
         }
 
+        if (string.IsNullOrWhiteSpace(outputDirectory))
+            throw new ArgumentException("必须指定输出目录（不能把 CBZ 写进临时会话目录）", nameof(outputDirectory));
+
         var title = string.IsNullOrWhiteSpace(meta.Title) ? "未命名" : meta.Title.Trim();
-        var dir = string.IsNullOrWhiteSpace(outputDirectory)
-            ? Path.GetDirectoryName(Path.GetFullPath(pages[0].FilePath)) ?? Environment.CurrentDirectory
-            : outputDirectory;
+        var dir = outputDirectory;
         Directory.CreateDirectory(dir);
         var outputPath = string.IsNullOrWhiteSpace(options.OutputPath)
             ? Path.Combine(dir, ImageOrder.SanitizeFileName(title) + ".cbz")

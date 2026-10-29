@@ -13,6 +13,9 @@ public static class WebpTranscoder
 {
     public const int DefaultQuality = 95;
 
+    /// <summary>libwebp 的硬上限：单边最大 16383 像素，超过会直接编码失败。</summary>
+    public const int MaxWebpSide = 16383;
+
     /// <summary>把 PNG/任意图片转成有损 WebP，返回最终像素尺寸。</summary>
     public static (int Width, int Height) Encode(
         string sourcePath,
@@ -50,6 +53,11 @@ public static class WebpTranscoder
 
         var dir = Path.GetDirectoryName(destPath);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+        if (image.Width > MaxWebpSide || image.Height > MaxWebpSide)
+            throw new InvalidOperationException(
+                $"输出尺寸 {image.Width}×{image.Height} 超过 WebP 单边上限 {MaxWebpSide}；" +
+                "请在设置里填「输出长边上限」（如 6000）后重试。");
 
         image.SaveAsWebp(destPath, new WebpEncoder
         {
