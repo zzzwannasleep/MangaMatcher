@@ -89,7 +89,8 @@
                         <Border Classes="group">
                             <StackPanel Spacing="2">
                                 <TextBlock Classes="groupTitle" Text="④ 工具" />
-                                <Button x:Name="BtnFolderTag" Content="文件夹名打标签" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                <Button x:Name="BtnDedupe" Content="重复清理（跨库同尺寸）" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />
+                                <Button x:Name="BtnFolderTag" Content="文件夹名打标签" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
                                 <Button x:Name="BtnMylarExport" Content="导出 series.json" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
                                 <Grid ColumnDefinitions="*,*,8" Margin="0,4,0,0">
                                     <Button x:Name="BtnOpenData" Grid.Column="0" Content="打开数据目录" Classes="app" MinHeight="30" HorizontalAlignment="Stretch" />

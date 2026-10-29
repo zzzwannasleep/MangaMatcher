@@ -1144,4 +1144,70 @@ public sealed partial class MainWindow
         await RunBusyAsync(ct => _mylar!.ExportAsync(libId, libraryRoot, covers, outputDir, ct));
         await Ui.InfoAsync(this, "Mylar 导出完成，详见日志", "完成");
     }
+
+    // ---- 重复清理（跨库同尺寸去重） ----
+
+    /// <summary>
+    /// 打开重复清理窗口：以「保留库」为基准，在「清理库」里找同尺寸（可叠加页数/哈希）的书并删除。
+    /// 删除用 Komga 官方 DELETE 接口，不可恢复；窗口内的 Dry-run 默认跟随主界面的勾选。
+    /// </summary>
+    private async Task OpenDedupeAsync()
+    {
+        if (!GuardBusy()) return;
+        if (_komga == null)
+        {
+            await Ui.MessageAsync(this, "请先测试连接（Komga 未就绪）", "重复清理", okOnly: true);
+            return;
+        }
+
+        // 库列表还没加载过（没点过「测试连接」）→ 现拉一次
+        if (_libraries.Count < 2)
+        {
+            try
+            {
+                var libs = await RunBusyAsync(ct => _komga!.GetLibrariesAsync(ct));
+                FillLibraryCombo(libs);
+                _libCache?.SetLibraries(libs, LibraryCache.ConnKeyOf(_settings));
+                Log("INFO", $"重复清理：已获取 {libs.Count} 个库");
+            }
+            catch (Exception e)
+            {
+                Log("ERR ", $"[重复清理] 获取库列表失败: {e.Message}");
+                await Ui.ErrorAsync(this, $"获取库列表失败：{e.Message}\n请先点击\"测试连接\"检查地址与密钥");
+                return;
+            }
+        }
+
+        if (_libraries.Count < 2)
+        {
+            await Ui.MessageAsync(this,
+                $"重复清理需要至少两个库（当前 {_libraries.Count} 个）。\n" +
+                "请先在 Komga 里建好「保留库」和「清理库」，再回来操作。",
+                "重复清理", okOnly: true);
+            return;
+        }
+
+        var dlg = new DedupeWindow(_komga, _libraries, Log,
+            ChkDryRun.IsChecked == true,
+            _settings.DedupeKeepLibraryId, _settings.DedupeCleanLibraryId,
+            _settings.DedupeMode, _settings.DedupeMatch);
+        await dlg.ShowDialog(this);
+
+        if (dlg.LastKeepLibraryId.Length > 0)
+        {
+            _settings.DedupeKeepLibraryId = dlg.LastKeepLibraryId;
+            _settings.DedupeCleanLibraryId = dlg.LastCleanLibraryId;
+            _settings.DedupeMode = dlg.LastMode;
+            _settings.DedupeMatch = dlg.LastMatch;
+            SaveSettings();
+        }
+
+        if (dlg.DeletedCount > 0)
+        {
+            Log("INFO", $"[重复清理] 已删除 {dlg.DeletedCount} 项，后台对齐清理库缓存…");
+            var clean = _libraries.FirstOrDefault(l => l.Id == _settings.DedupeCleanLibraryId);
+            if (clean != null && _libCache != null) _ = SilentRefreshLibraryAsync(clean);
+        }
+        _contextSeries = null;
+    }
 }

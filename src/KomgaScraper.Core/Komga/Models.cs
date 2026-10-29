@@ -93,10 +93,31 @@ public sealed class BookDto
     [JsonPropertyName("number")] public int Number { get; set; }
     [JsonPropertyName("seriesId")] public string SeriesId { get; set; } = "";
     [JsonPropertyName("url")] public string? Url { get; set; }
-    [JsonPropertyName("fileSize")] public long FileSize { get; set; }
     [JsonPropertyName("deleted")] public bool Deleted { get; set; }
     [JsonPropertyName("metadata")] public BookMetadataDto? Metadata { get; set; }
     [JsonPropertyName("oneshot")] public bool Oneshot { get; set; }
+
+    /// <summary>Komga 1.x 的书籍所属库 id（books/list 未过滤时用于区分来源）。</summary>
+    [JsonPropertyName("libraryId")] public string? LibraryId { get; set; }
+    /// <summary>书籍所属系列标题（现代 Komga 在 books/list 里直接返回，省一次 series 查询）。</summary>
+    [JsonPropertyName("seriesTitle")] public string? SeriesTitle { get; set; }
+    /// <summary>文件大小（字节）。Komga 1.x 字段名是 sizeBytes。</summary>
+    [JsonPropertyName("sizeBytes")] public long SizeBytes { get; set; }
+    /// <summary>旧版/部分版本返回的 fileSize（仅作兜底，正常读 SizeBytes）。</summary>
+    [JsonPropertyName("fileSize")] public long FileSize { get; set; }
+    /// <summary>文件哈希（库设置开启 hashFiles 时才有；重复清理的严格校验用）。</summary>
+    [JsonPropertyName("fileHash")] public string? FileHash { get; set; }
+    [JsonPropertyName("media")] public MediaDto? Media { get; set; }
+
+    /// <summary>统一取文件大小：优先 sizeBytes，老版本没有时回落 fileSize。</summary>
+    public long EffectiveSizeBytes => SizeBytes > 0 ? SizeBytes : FileSize;
+}
+
+public sealed class MediaDto
+{
+    [JsonPropertyName("pagesCount")] public int PagesCount { get; set; }
+    [JsonPropertyName("mediaType")] public string? MediaType { get; set; }
+    [JsonPropertyName("status")] public string? Status { get; set; }
 }
 
 public sealed class BookMetadataDto
@@ -168,6 +189,19 @@ public static class KomgaQuery
             allOf = new object[]
             {
                 new { seriesId = new { @operator = "is", value = seriesId } },
+                new { deleted = new { @operator = "isFalse" } }
+            }
+        }
+    };
+
+    /// <summary>整库书籍（重复清理/跨库比对用）。</summary>
+    public static object BooksInLibrary(string libraryId) => new
+    {
+        condition = new
+        {
+            allOf = new object[]
+            {
+                new { libraryId = new { @operator = "is", value = libraryId } },
                 new { deleted = new { @operator = "isFalse" } }
             }
         }

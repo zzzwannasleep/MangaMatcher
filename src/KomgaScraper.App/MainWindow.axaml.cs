@@ -156,6 +156,7 @@ public sealed partial class MainWindow : Window
         BtnManualMatch.Click += async (_, _) => await CorrectMatchAsync();
         BtnCoverScrape.Click += async (_, _) => await CoverScrapeAsync();
         BtnFolderTag.Click += async (_, _) => await FolderTagAsync();
+        BtnDedupe.Click += async (_, _) => await OpenDedupeAsync();
         BtnMylarExport.Click += async (_, _) => await MylarExportAsync();
         BtnOpenData.Click += (_, _) => OpenDataDir();
         BtnExportLog.Click += (_, _) => ExportLog();

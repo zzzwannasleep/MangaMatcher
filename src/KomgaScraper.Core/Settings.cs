@@ -76,6 +76,17 @@ public sealed class AppSettings
     /// <summary>标记黑名单：命中的后缀不落标签，标题里残留的旧后缀也会被清掉。</summary>
     [JsonPropertyName("tagBlacklist")] public List<string> TagBlacklist { get; set; } = [];
 
+    // ================= 重复清理（跨库同尺寸去重） =================
+
+    /// <summary>上次用的「保留库」id（重复清理窗口打开时自动选中）。</summary>
+    [JsonPropertyName("dedupeKeepLibraryId")] public string DedupeKeepLibraryId { get; set; } = "";
+    /// <summary>上次用的「清理库」id（这个库里的重复会被删）。</summary>
+    [JsonPropertyName("dedupeCleanLibraryId")] public string DedupeCleanLibraryId { get; set; } = "";
+    /// <summary>上次用的粒度："series"（整部系列，默认）/ "book"（逐册）。</summary>
+    [JsonPropertyName("dedupeMode")] public string DedupeMode { get; set; } = "series";
+    /// <summary>上次用的判定强度："size" / "pages"（默认）/ "hash"。</summary>
+    [JsonPropertyName("dedupeMatch")] public string DedupeMatch { get; set; } = "pages";
+
     // ================= 便携式路径（全部在 exe 同目录下） =================
 
     /// <summary>数据目录：&lt;exe 所在目录&gt;\data。单文件发布时即 exe 旁边的 data 文件夹。</summary>

@@ -187,6 +187,41 @@ public sealed class KomgaClient : IDisposable
         return data?.Content ?? [];
     }
 
+    /// <summary>分页拉取整库书籍（POST /books/list，libraryId 过滤；重复清理跨库比对用）。</summary>
+    public async Task<List<BookDto>> ListBooksInLibraryAsync(string libraryId, CancellationToken ct = default)
+    {
+        var all = new List<BookDto>();
+        const int size = 2000;
+        var page = 0;
+        while (true)
+        {
+            var payload = KomgaQuery.BooksInLibrary(libraryId);
+            var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Post,
+                $"v1/books/list?size={size}&page={page}")
+            { Content = JsonContent.Create(payload) }).ConfigureAwait(false);
+            var data = await resp.Content.ReadFromJsonAsync<PageDto<BookDto>>(JsonOpts, ct).ConfigureAwait(false);
+            var content = data?.Content ?? [];
+            all.AddRange(content);
+            if (content.Count < size) break;
+            page++;
+        }
+        return all;
+    }
+
+    /// <summary>删除单册文件（DELETE /books/{id}/file，ADMIN；Komga 返回 202，删除异步完成）。</summary>
+    public async Task DeleteBookFileAsync(string bookId, CancellationToken ct = default)
+    {
+        using var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"v1/books/{bookId}/file"))
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>删除整部系列的全部书籍文件（DELETE /series/{id}/file，ADMIN；202 异步）。</summary>
+    public async Task DeleteSeriesFileAsync(string seriesId, CancellationToken ct = default)
+    {
+        using var resp = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"v1/series/{seriesId}/file"))
+            .ConfigureAwait(false);
+    }
+
     /// <summary>全库关键词搜索系列（GET /series?search=…，编辑器的搜索栏用；跨库，返回含各库系列）。</summary>
     public async Task<List<SeriesDto>> SearchSeriesAsync(string query, int size = 50, CancellationToken ct = default)
     {

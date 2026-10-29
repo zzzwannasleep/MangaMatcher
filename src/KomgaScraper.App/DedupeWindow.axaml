@@ -1,0 +1,122 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="KomgaScraper.App.DedupeWindow"
+        Title="重复清理 — 跨库同尺寸去重"
+        Width="1160" Height="720" MinWidth="960" MinHeight="580"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Microsoft YaHei UI, PingFang SC, Segoe UI"
+        Background="{DynamicResource AppBgBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="10,10,10,10">
+
+        <!-- ================= 配置区 ================= -->
+        <Border Grid.Row="0" Classes="group">
+            <StackPanel Spacing="8">
+                <TextBlock Classes="groupTitle" Text="① 选择库与判定方式" />
+
+                <Grid ColumnDefinitions="*,14,*">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Classes="fieldLabel" Text="保留库（只读，不删）" />
+                        <ComboBox x:Name="CmbKeep" HorizontalAlignment="Stretch" PlaceholderText="选择保留的库">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="3">
+                        <TextBlock Classes="fieldLabel" Text="清理库（删这里的重复，保留库里的对应项不动）" />
+                        <ComboBox x:Name="CmbClean" HorizontalAlignment="Stretch" PlaceholderText="选择要清理的库">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,14,*">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Classes="fieldLabel" Text="删除粒度" />
+                        <ComboBox x:Name="CmbMode" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="3">
+                        <TextBlock Classes="fieldLabel" Text="重复判定强度" />
+                        <ComboBox x:Name="CmbMatch" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="TxtNote" Grid.Column="0" VerticalAlignment="Center" FontSize="11"
+                               Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap"
+                               Text="以「保留库」为基准，在「清理库」里找文件大小相同的书；只删清理库，保留库永远不动。删除走 Komga 官方接口，不可恢复，建议先 Dry-run 预览。" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="12,0,0,0">
+                        <CheckBox x:Name="ChkDryRun" Content="Dry-run（只预览，不删除）" VerticalAlignment="Center" />
+                        <Button x:Name="BtnScan" Content="扫描重复" Classes="primary" MinWidth="110" MinHeight="30" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ================= 结果区 ================= -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,8,0,0">
+            <Grid ColumnDefinitions="*,Auto" Margin="2,0,2,6">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock x:Name="TxtSummary" Text="尚未扫描：选好两个库后点「扫描重复」"
+                               VerticalAlignment="Center" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <ProgressBar x:Name="BusyBar" IsIndeterminate="True" IsVisible="False"
+                                 Width="120" Height="6" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                    <Button x:Name="BtnSelectAll" Content="全选可删" Classes="app" MinHeight="26" Padding="9,2"
+                            IsEnabled="False" />
+                    <Button x:Name="BtnSelectNone" Content="全不选" Classes="app" MinHeight="26" Padding="9,2"
+                            IsEnabled="False" />
+                </StackPanel>
+            </Grid>
+
+            <DataGrid Grid.Row="1" x:Name="RowsGrid"
+                      AutoGenerateColumns="False" CanUserResizeColumns="True" CanUserSortColumns="False"
+                      GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource GridLinesBrush}"
+                      HeadersVisibility="Column" SelectionMode="Single"
+                      Background="{DynamicResource CardBgBrush}" RowBackground="Transparent"
+                      BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}" CornerRadius="8">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Width="40" CanUserSort="False" CanUserResize="False">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding Checked, Mode=TwoWay}"
+                                          IsEnabled="{Binding Selectable}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="判定" Binding="{Binding KindText}" Width="86" IsReadOnly="True" />
+                    <DataGridTextColumn Header="清理库里的（要删）" Binding="{Binding Title}" Width="300"
+                                        MinWidth="180" IsReadOnly="True" />
+                    <DataGridTextColumn Header="册数" Binding="{Binding Books}" Width="54" IsReadOnly="True" />
+                    <DataGridTextColumn Header="保留库对应" Binding="{Binding KeepTitles}" Width="*"
+                                        MinWidth="160" IsReadOnly="True" />
+                    <DataGridTextColumn Header="大小" Binding="{Binding SizeText}" Width="86" IsReadOnly="True" />
+                    <DataGridTextColumn Header="匹配依据" Binding="{Binding Evidence}" Width="240" IsReadOnly="True" />
+                    <DataGridTextColumn Header="文件夹" Binding="{Binding Folder}" Width="160" IsReadOnly="True" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+
+        <!-- ================= 底栏 ================= -->
+        <Border Grid.Row="2" Margin="0,8,0,0" Padding="10,8"
+                Background="{DynamicResource PanelBgBrush}" CornerRadius="8"
+                BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock x:Name="TxtSelected" Grid.Column="0" Text="未选择任何项"
+                           VerticalAlignment="Center" FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="BtnExecute" Content="删除选中项" Classes="primary" MinWidth="130" MinHeight="32"
+                            IsEnabled="False" />
+                    <Button x:Name="BtnClose" Content="关闭" Classes="app" MinWidth="90" MinHeight="32" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
